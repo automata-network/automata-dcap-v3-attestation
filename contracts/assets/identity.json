@@ -1,0 +1,60 @@
+{
+    "enclaveIdentity": {
+        "id": "QE",
+        "version": 2,
+        "issueDate": "2023-09-26T04:22:58Z",
+        "nextUpdate": "2023-10-26T04:22:58Z",
+        "tcbEvaluationDataNumber": 16,
+        "miscselect": "00000000",
+        "miscselectMask": "FFFFFFFF",
+        "attributes": "11000000000000000000000000000000",
+        "attributesMask": "FBFFFFFFFFFFFFFF0000000000000000",
+        "mrsigner": "8C4F5775D796503E96137F77C68A829A0056AC8DED70140B081B094490C57BFF",
+        "isvprodid": 1,
+        "tcbLevels": [
+            {
+                "tcb": {
+                    "isvsvn": 8
+                },
+                "tcbDate": "2023-08-09T00:00:00Z",
+                "tcbStatus": "UpToDate"
+            },
+            {
+                "tcb": {
+                    "isvsvn": 6
+                },
+                "tcbDate": "2021-11-10T00:00:00Z",
+                "tcbStatus": "OutOfDate"
+            },
+            {
+                "tcb": {
+                    "isvsvn": 5
+                },
+                "tcbDate": "2020-11-11T00:00:00Z",
+                "tcbStatus": "OutOfDate"
+            },
+            {
+                "tcb": {
+                    "isvsvn": 4
+                },
+                "tcbDate": "2019-11-13T00:00:00Z",
+                "tcbStatus": "OutOfDate"
+            },
+            {
+                "tcb": {
+                    "isvsvn": 2
+                },
+                "tcbDate": "2019-05-15T00:00:00Z",
+                "tcbStatus": "OutOfDate"
+            },
+            {
+                "tcb": {
+                    "isvsvn": 1
+                },
+                "tcbDate": "2018-08-15T00:00:00Z",
+                "tcbStatus": "OutOfDate"
+            }
+        ]
+    },
+    "signature": "0956d88b39b19cfb24f88513061fc873626a4c9c7cf35f14ec5baa1955890fc65a0008fe3763e0573c997d58f320e8f96ba39881a82e323f6934d0083df4582f"
+}
