@@ -18,7 +18,8 @@ contract PEMCertChainLib is IPEMCertChainLib {
     uint256 internal constant FOOTER_LENGTH = 25;
 
     string constant PCK_COMMON_NAME = "Intel SGX PCK Certificate";
-    string constant PCK_ISSUER_NAME = "Intel SGX PCK Platform CA";
+    string constant PLATFORM_ISSUER_NAME = "Intel SGX PCK Platform CA";
+    string constant PROCESSOR_ISSUER_NAME = "Intel SGX PCK Processor CA";
     bytes constant SGX_EXTENSION_OID = hex"2A864886F84D010D01";
     bytes constant TCB_OID = hex"2A864886F84D010D0102";
     bytes constant PCESVN_OID = hex"2A864886F84D010D010211";
@@ -107,7 +108,8 @@ contract PEMCertChainLib is IPEMCertChainLib {
             issuerPtr = der.firstChildOf(issuerPtr);
             issuerPtr = der.nextSiblingOf(issuerPtr);
             cert.pck.issuerName = string(der.bytesAt(issuerPtr));
-            if (!LibString.eq(cert.pck.issuerName, PCK_ISSUER_NAME)) {
+            bool issuerNameIsValid = LibString.eq(cert.pck.issuerName, PLATFORM_ISSUER_NAME) || LibString.eq(cert.pck.issuerName, PROCESSOR_ISSUER_NAME);
+            if (!issuerNameIsValid) {
                 return (false, cert);
             }
         }

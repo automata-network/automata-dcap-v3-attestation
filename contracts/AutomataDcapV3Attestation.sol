@@ -115,7 +115,8 @@ contract AutomataDcapV3Attestation is IAttestation {
     ) internal pure virtual returns (bool valid) {
         return
             status == TCBInfoStruct.TCBStatus.OK ||
-            status == TCBInfoStruct.TCBStatus.TCB_SW_HARDENING_NEEDED;
+            status == TCBInfoStruct.TCBStatus.TCB_SW_HARDENING_NEEDED ||
+            status == TCBInfoStruct.TCBStatus.TCB_CONFIGURATION_AND_SW_HARDENING_NEEDED;
     }
 
     /// @dev Provide the raw quote binary as input
