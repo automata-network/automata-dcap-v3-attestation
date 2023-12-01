@@ -1,1 +1,2 @@
 solady/=node_modules/solady/
+p256-verifier/=lib/p256-verifier/src/
