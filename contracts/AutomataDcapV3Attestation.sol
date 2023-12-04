@@ -266,14 +266,14 @@ contract AutomataDcapV3Attestation is IAttestation {
 
         // Step 7: Verify cert chain for PCK
         {
-            // 2.7M gas (rootCA pubkey is trusted)
+            // 660k gas (rootCA pubkey is trusted)
             bool pckCertChainVerified = _verifyCertChain(parsedQuoteCerts);
             if (!pckCertChainVerified) {
                 return (false, retData);
             }
         }
 
-        // Step 8: Verify the local attestation sig and qe report sig = 2.8M gas
+        // Step 8: Verify the local attestation sig and qe report sig = 670k gas
         {
             bool enclaveReportSigsVerified = _enclaveReportSigVerification(
                 parsedQuoteCerts[0].pubKey,

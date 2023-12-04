@@ -4,3 +4,5 @@ node_modules/
 typechain-types/
 **/.DS_Store
 out/
+**/.env
+broadcast/
