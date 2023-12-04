@@ -70,7 +70,7 @@ contract AutomataDcapV3Attestation is IAttestation {
     function addRevokedCertSerialNum(
         uint256 index,
         bytes[] calldata serialNumBatch
-    ) internal {
+    ) external onlyOwner {
         for (uint256 i = 0; i < serialNumBatch.length; i++) {
             if (serialNumIsRevoked[index][serialNumBatch[i]]) {
                 continue;
@@ -82,7 +82,7 @@ contract AutomataDcapV3Attestation is IAttestation {
     function removeRevokedCertSerialNum(
         uint256 index,
         bytes[] calldata serialNumBatch
-    ) internal {
+    ) external onlyOwner {
         for (uint256 i = 0; i < serialNumBatch.length; i++) {
             if (!serialNumIsRevoked[index][serialNumBatch[i]]) {
                 continue;
