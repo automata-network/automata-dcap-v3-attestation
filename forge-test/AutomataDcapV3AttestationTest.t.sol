@@ -14,8 +14,8 @@ contract AutomataDcapV3AttestationTest is Test, DcapTestUtils {
     AutomataDcapV3Attestation attestation;
     SigVerifyLib sigVerifyLib;
     string internal constant rpcUrl = "https://1rpc.io/ata/testnet";
-    string internal constant tcbInfoPath = "contracts/assets/tcbInfo.json";
-    string internal constant idPath = "contracts/assets/identity.json";
+    string internal constant tcbInfoPath = "contracts/assets/0923/tcbInfo.json";
+    string internal constant idPath = "contracts/assets/0923/identity.json";
     address constant admin = address(1);
     address constant user = 0x0926b716f6aEF52F9F3C3474A2846e1Bf1ACedf6;
     bytes32 constant mrEnclave = 0x46049af725ec3986eeb788693df7bc5f14d3f2705106a19cd09b9d89237db1a0;

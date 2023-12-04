@@ -30,7 +30,7 @@ async function main() {
 }
 
 function parseEnclaveId(): EnclaveIdStruct.EnclaveIdStruct {
-  const fileContent = fs.readFileSync('contracts/assets/identity.json', 'utf8');
+  const fileContent = fs.readFileSync('contracts/assets/0923/identity.json', 'utf8');
   const obj = JSON.parse(fileContent);
   var enclaveId = obj.enclaveIdentity as EnclaveIdStruct.EnclaveIdStruct;
   enclaveId.miscselect = "0x" + enclaveId.miscselect;
@@ -49,7 +49,7 @@ function parseEnclaveId(): EnclaveIdStruct.EnclaveIdStruct {
 }
 
 function parseTcbInfo(): TCBInfoStruct.TCBInfoStruct {
-  const fileContent = fs.readFileSync('contracts/assets/tcbInfo.json', 'utf8');
+  const fileContent = fs.readFileSync('contracts/assets/0923/tcbInfo.json', 'utf8');
   const obj = JSON.parse(fileContent);
   var tcbInfo = obj.tcbInfo as TCBInfoStruct.TCBInfoStruct;
   const fmspc = obj.tcbInfo.fmspc;;

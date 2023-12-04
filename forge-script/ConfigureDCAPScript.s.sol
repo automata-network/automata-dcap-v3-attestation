@@ -8,8 +8,8 @@ import "./utils/CRLParser.s.sol";
 
 contract ConfigureDcapAttestationScript is Script, DcapTestUtils, CRLParser {
 
-    string internal constant tcbInfoPath = "assets/dcap/tcbInfo.json";
-    string internal constant idPath = "assets/dcap/identity.json";
+    string internal constant tcbInfoPath = "contracts/assets/0923/tcbInfo.json";
+    string internal constant idPath = "contracts/assets/0923/identity.json";
     string internal constant fmspc = "00606a000000";
     AutomataDcapV3Attestation attestation;
     address dcapAttestationAddr = 0x5C819CE06daF76Ef5Ae732f3e291047962130ad5; // TBD
