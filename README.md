@@ -11,5 +11,5 @@
 ## Deployment
 
 ```
-> npx hardhat run ./script/deploy.ts
+> npx hardhat run ./scripts/deploy.ts
 ```

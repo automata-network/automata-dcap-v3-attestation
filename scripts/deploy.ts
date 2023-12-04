@@ -51,7 +51,7 @@ function parseEnclaveId(): EnclaveIdStruct.EnclaveIdStruct {
 function parseTcbInfo(): TCBInfoStruct.TCBInfoStruct {
   const fileContent = fs.readFileSync('contracts/assets/0923/tcbInfo.json', 'utf8');
   const obj = JSON.parse(fileContent);
-  var tcbInfo = obj.tcbInfo as TCBInfoStruct.TCBInfoStruct;
+  var tcbInfo = obj.tcbInfo;
   const fmspc = obj.tcbInfo.fmspc;;
   tcbInfo.pceid = tcbInfo.pceId;
   for (var i in tcbInfo.tcbLevels) {

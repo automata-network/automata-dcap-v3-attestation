@@ -13,6 +13,8 @@ contract AutomataDcapV3AttestationTest is Test, DcapTestUtils {
 
     AutomataDcapV3Attestation attestation;
     SigVerifyLib sigVerifyLib;
+    // use a network that where the P256Verifier contract exists
+    // ref: https://github.com/daimo-eth/p256-verifier
     string internal constant rpcUrl = "https://1rpc.io/ata/testnet";
     string internal constant tcbInfoPath = "contracts/assets/0923/tcbInfo.json";
     string internal constant idPath = "contracts/assets/0923/identity.json";
@@ -31,6 +33,8 @@ contract AutomataDcapV3AttestationTest is Test, DcapTestUtils {
         vm.selectFork(fork);
         
         // pinned September 23rd, 2023, 0221 UTC
+        // comment this line out if you are replacing sampleQuote with your own
+        // this line is needed to bypass expiry reverts for stale quotes
         vm.warp(1695435682);
 
         vm.deal(admin, 100 ether);
