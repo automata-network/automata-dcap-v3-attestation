@@ -47,9 +47,9 @@ contract AutomataDcapV3Attestation is IAttestation {
 
     address public owner;
 
-    constructor(address sigVerifyLibAddr) {
+    constructor(address sigVerifyLibAddr, address pemCertLibAddr) {
         sigVerifyLib = ISigVerifyLib(sigVerifyLibAddr);
-        pemCertLib = new PEMCertChainLib();
+        pemCertLib = PEMCertChainLib(pemCertLibAddr);
         owner = msg.sender;
     }
 

@@ -4,6 +4,7 @@ pragma solidity ^0.8.13;
 import "forge-std/Test.sol";
 import {AutomataDcapV3Attestation} from "../contracts/AutomataDcapV3Attestation.sol";
 import {SigVerifyLib} from "../contracts/utils/SigVerifyLib.sol";
+import {PEMCertChainLib} from "../contracts/lib/PEMCertChainLib.sol";
 import {BytesUtils} from "../contracts/utils/BytesUtils.sol";
 import {Base64} from "solady/src/Milady.sol";
 import "./utils/DcapTestUtils.t.sol";
@@ -13,6 +14,7 @@ contract AutomataDcapV3AttestationTest is Test, DcapTestUtils {
 
     AutomataDcapV3Attestation attestation;
     SigVerifyLib sigVerifyLib;
+    PEMCertChainLib pemCertChainLib;
     // use a network that where the P256Verifier contract exists
     // ref: https://github.com/daimo-eth/p256-verifier
     string internal rpcUrl = vm.envString("SEPOLIA_URL");
@@ -39,7 +41,8 @@ contract AutomataDcapV3AttestationTest is Test, DcapTestUtils {
 
         vm.startPrank(admin);
         sigVerifyLib = new SigVerifyLib();
-        attestation = new AutomataDcapV3Attestation(address(sigVerifyLib));
+        pemCertChainLib = new PEMCertChainLib();
+        attestation = new AutomataDcapV3Attestation(address(sigVerifyLib), address(pemCertChainLib));
         attestation.setMrEnclave(mrEnclave, true);
         attestation.setMrSigner(mrSigner, true);
 

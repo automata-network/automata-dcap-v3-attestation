@@ -7,7 +7,11 @@ async function main() {
   await sigVerifyLib.waitForDeployment();
   const sigVerifyLibAddr = await sigVerifyLib.getAddress();
   console.log("sigVerifyLib address:", sigVerifyLibAddr);
-  const attestation = await ethers.deployContract("AutomataDcapV3Attestation", [sigVerifyLibAddr], {});
+  const pemCertLib = await ethers.deployContract("PEMCertChainLib");
+  await pemCertLib.waitForDeployment();
+  const pemCertLibAddr = await pemCertLib.getAddress();
+  console.log("pemCertLib address:", pemCertLibAddr);
+  const attestation = await ethers.deployContract("AutomataDcapV3Attestation", [sigVerifyLibAddr, pemCertLibAddr], {});
   await attestation.waitForDeployment();
   const attestationAddr = await attestation.getAddress();
   console.log("attestation address:", attestationAddr);
