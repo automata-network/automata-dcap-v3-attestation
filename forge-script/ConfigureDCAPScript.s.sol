@@ -34,7 +34,7 @@
 //         //     parseEnclaveIdentityJson(enclaveIdJson);
 //         // require(qeIdParsedSuccess, "failed to parse qeID");
 //         // attestation.configureQeIdentityJson(parsedEnclaveId);
-        
+
 //         // // configure CRL
 //         bytes[] memory crl = decodeCrl(samplePckCrl);
 //         attestation.addRevokedCertSerialNum(0, crl);

@@ -108,7 +108,8 @@ contract PEMCertChainLib is IPEMCertChainLib {
             issuerPtr = der.firstChildOf(issuerPtr);
             issuerPtr = der.nextSiblingOf(issuerPtr);
             cert.pck.issuerName = string(der.bytesAt(issuerPtr));
-            bool issuerNameIsValid = LibString.eq(cert.pck.issuerName, PLATFORM_ISSUER_NAME) || LibString.eq(cert.pck.issuerName, PROCESSOR_ISSUER_NAME);
+            bool issuerNameIsValid = LibString.eq(cert.pck.issuerName, PLATFORM_ISSUER_NAME)
+                || LibString.eq(cert.pck.issuerName, PROCESSOR_ISSUER_NAME);
             if (!issuerNameIsValid) {
                 return (false, cert);
             }

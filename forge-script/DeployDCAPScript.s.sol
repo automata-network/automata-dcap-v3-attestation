@@ -15,9 +15,7 @@ contract DeployDCAPScript is Script {
 
         sigVerifyLib = new SigVerifyLib();
 
-        attestation = new AutomataDcapV3Attestation(
-            address(sigVerifyLib)
-        );
+        attestation = new AutomataDcapV3Attestation(address(sigVerifyLib));
 
         vm.stopBroadcast();
     }
