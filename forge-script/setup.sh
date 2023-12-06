@@ -37,6 +37,6 @@ echo "[LOG] Configuring QeIdentity..."
 QE_ID_OUTPUT=$(forge script $CONFIGURE_SCRIPT --sig "configureQeIdentity(string)" "" $FORGE_COMMAND_SUFFIX | grep Hash)
 echo $QE_ID_OUTPUT
 
-echo "[LOG] Adding revoked serial numbers from the provided CRL..."
-CRL_OUTPUT=$(forge script $CONFIGURE_SCRIPT --sig "configureCrl()" "" $FORGE_COMMAND_SUFFIX | grep Hash)
+echo "[LOG] Adding revoked PCK serial numbers from the provided CRL..."
+CRL_OUTPUT=$(forge script $CONFIGURE_SCRIPT --sig "configureCrl(uint256)" 0 $FORGE_COMMAND_SUFFIX | grep Hash)
 echo $CRL_OUTPUT

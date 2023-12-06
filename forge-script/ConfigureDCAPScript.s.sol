@@ -51,10 +51,10 @@ contract ConfigureDcapAttestationScript is Script, DcapTestUtils, CRLParser {
     }
 
     // CRLs are provided directly in the CRLParser.s.sol script in it's DER encoded form
-    function configureCrl() public {
+    function configureCrl(uint256 index) public {
         bytes[] memory crl = decodeCrl(samplePckCrl);
 
         vm.broadcast(deployerKey);
-        attestation.addRevokedCertSerialNum(0, crl);
+        attestation.addRevokedCertSerialNum(index, crl);
     }
 }
