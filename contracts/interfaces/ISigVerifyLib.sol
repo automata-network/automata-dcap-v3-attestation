@@ -57,6 +57,6 @@ interface ISigVerifyLib {
 
     function verifyES256Signature(bytes memory tbs, bytes memory signature, bytes memory publicKey)
         external
-        pure
+        view
         returns (bool sigValid);
 }

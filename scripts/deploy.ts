@@ -7,7 +7,11 @@ async function main() {
   await sigVerifyLib.waitForDeployment();
   const sigVerifyLibAddr = await sigVerifyLib.getAddress();
   console.log("sigVerifyLib address:", sigVerifyLibAddr);
-  const attestation = await ethers.deployContract("AutomataDcapV3Attestation", [sigVerifyLibAddr], {});
+  const pemCertLib = await ethers.deployContract("PEMCertChainLib");
+  await pemCertLib.waitForDeployment();
+  const pemCertLibAddr = await pemCertLib.getAddress();
+  console.log("pemCertLib address:", pemCertLibAddr);
+  const attestation = await ethers.deployContract("AutomataDcapV3Attestation", [sigVerifyLibAddr, pemCertLibAddr], {});
   await attestation.waitForDeployment();
   const attestationAddr = await attestation.getAddress();
   console.log("attestation address:", attestationAddr);
@@ -30,7 +34,7 @@ async function main() {
 }
 
 function parseEnclaveId(): EnclaveIdStruct.EnclaveIdStruct {
-  const fileContent = fs.readFileSync('contracts/assets/identity.json', 'utf8');
+  const fileContent = fs.readFileSync('contracts/assets/0923/identity.json', 'utf8');
   const obj = JSON.parse(fileContent);
   var enclaveId = obj.enclaveIdentity as EnclaveIdStruct.EnclaveIdStruct;
   enclaveId.miscselect = "0x" + enclaveId.miscselect;
@@ -49,9 +53,9 @@ function parseEnclaveId(): EnclaveIdStruct.EnclaveIdStruct {
 }
 
 function parseTcbInfo(): TCBInfoStruct.TCBInfoStruct {
-  const fileContent = fs.readFileSync('contracts/assets/tcbInfo.json', 'utf8');
+  const fileContent = fs.readFileSync('contracts/assets/0923/tcbInfo.json', 'utf8');
   const obj = JSON.parse(fileContent);
-  var tcbInfo = obj.tcbInfo as TCBInfoStruct.TCBInfoStruct;
+  var tcbInfo = obj.tcbInfo;
   const fmspc = obj.tcbInfo.fmspc;;
   tcbInfo.pceid = tcbInfo.pceId;
   for (var i in tcbInfo.tcbLevels) {

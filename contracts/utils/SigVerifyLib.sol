@@ -1,10 +1,16 @@
-// SPDX-License-Identifier: MIT
+// SPDX-License-Identifier: GPL-3.0
 pragma solidity ^0.8.0;
 
+import "p256-verifier/P256.sol";
 import "../interfaces/ISigVerifyLib.sol";
 import "./RsaVerify.sol";
-import "./EllipticCurveLib.sol";
 import "./BytesUtils.sol";
+
+// Library for verifying signatures
+// Supports verifying signatures with the following algorithms:
+// - RS256
+// - ES256
+// - RS1
 
 contract SigVerifyLib is ISigVerifyLib {
     using BytesUtils for bytes;
@@ -83,7 +89,7 @@ contract SigVerifyLib is ISigVerifyLib {
 
     function verifyES256Signature(bytes memory tbs, bytes memory signature, bytes memory publicKey)
         public
-        pure
+        view
         returns (bool sigValid)
     {
         // Parse signature
@@ -100,6 +106,6 @@ contract SigVerifyLib is ISigVerifyLib {
         uint256 gy = uint256(bytes32(publicKey.substring(32, 32)));
 
         // Verify signature
-        sigValid = EllipticCurveLib.validateSignature(uint256(sha256(tbs)), gx, gy, r, s);
+        sigValid = P256.verifySignatureAllowMalleability(sha256(tbs), r, s, gx, gy);
     }
 }
