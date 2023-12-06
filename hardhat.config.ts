@@ -5,7 +5,7 @@ import "@nomicfoundation/hardhat-foundry";
 
 dotenv.config();
 
-const { SEPOLIA_URL, PRIVATE_KEY } = process.env;
+const { RPC_URL, PRIVATE_KEY } = process.env;
 
 const config: HardhatUserConfig = {
   solidity: {
@@ -20,7 +20,9 @@ const config: HardhatUserConfig = {
   networks: {
     hardhat: {
       forking: {
-        url: SEPOLIA_URL!
+        // provide a network url where the P256Verifier library exists
+        // ref: https://github.com/daimo-eth/p256-verifier
+        url: RPC_URL!
       },
       accounts: [{
         privateKey: PRIVATE_KEY!,

@@ -17,7 +17,7 @@ contract AutomataDcapV3AttestationTest is Test, DcapTestUtils {
     PEMCertChainLib pemCertChainLib;
     // use a network that where the P256Verifier contract exists
     // ref: https://github.com/daimo-eth/p256-verifier
-    string internal rpcUrl = vm.envString("SEPOLIA_URL");
+    string internal rpcUrl = vm.envString("RPC_URL");
     string internal constant tcbInfoPath = "contracts/assets/0923/tcbInfo.json";
     string internal constant idPath = "contracts/assets/0923/identity.json";
     address constant admin = address(1);
