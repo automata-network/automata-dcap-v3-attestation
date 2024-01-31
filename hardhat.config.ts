@@ -9,13 +9,13 @@ const { SEPOLIA_URL, PRIVATE_KEY } = process.env;
 
 const config: HardhatUserConfig = {
   solidity: {
-    version: "0.8.21",
+    version: "0.8.18",
     settings: {
       optimizer: {
         enabled: true,
-        runs: 200
-      }
-    }
+        runs: Math.pow(2, 32) - 1
+      },
+      viaIR: true
   },
   networks: {
     hardhat: {
