@@ -7,8 +7,9 @@ test = 'forge-test'
 cache_path  = 'cache_forge'
 fs_permissions = [{ access = "read", path = "./"}]
 remappings = [
-    "solady/=lib/solady/",
-    "p256-verifier/=lib/p256-verifier/src/"
+    "solady/=lib/automata-on-chain-pccs/lib/solady/",
+    "p256-verifier/=lib/automata-on-chain-pccs/lib/p256-verifier/src/",
+    "@automata-network/on-chain-pccs/=lib/automata-on-chain-pccs/src"
 ]
 solc = "0.8.21"
 optimizer = true
