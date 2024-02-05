@@ -9,14 +9,23 @@ import {IPEMCertChainLib, PEMCertChainLib} from "../../lib/PEMCertChainLib.sol";
 library V3Parser {
     using BytesUtils for bytes;
 
-    uint256 constant MINIMUM_QUOTE_LENGTH = 1020;
-    bytes2 constant SUPPORTED_QUOTE_VERSION = 0x0300;
-    bytes2 constant SUPPORTED_ATTESTATION_KEY_TYPE = 0x0200;
-    // SGX only
-    bytes4 constant SUPPORTED_TEE_TYPE = 0;
+    /// @dev relevant constants can be found at https://github.com/intel/SGX-TDX-DCAP-QuoteVerificationLibrary/blob/stable/Src/AttestationLibrary/src/QuoteVerification/QuoteConstants.h
+
+    uint256 constant MINIMUM_QUOTE_LENGTH = 1020; // https://github.com/intel/SGX-TDX-DCAP-QuoteVerificationLibrary/blob/16b7291a7a86e486fdfcf1dfb4be885c0cc00b4e/Src/AttestationLibrary/src/QuoteVerification/QuoteConstants.h#L95-L99
+    bytes2 constant SUPPORTED_QUOTE_VERSION = 0x0300; // v3
+    bytes2 constant SUPPORTED_ATTESTATION_KEY_TYPE = 0x0200; // ECDSA_256_WITH_P256_CURVE
+    bytes4 constant SUPPORTED_TEE_TYPE = 0; // SGX
     bytes16 constant VALID_QE_VENDOR_ID = 0x939a7233f79c4ca9940a0db3957f0607;
 
-    function parseInput(bytes memory quote, address pemCertLibAddr)
+    /**
+     * @param quote encoded in bytes array
+     * The specification of the encoded bytes is described as the following:
+     * [0:48] bytes: quote header, see {V3Struct.Header} for definition
+     * [48:432] bytes: local enclave report, see {V3Struct.EnclaveReport} for definition
+     * [432:436] bytes: quote auth data length (X)
+     * [432:432 + X] bytes: quote auth data, see {V3Struct.ECDSAQuoteV3AuthData} for definition
+     */
+    function parseInput(bytes memory quote)
         internal
         pure
         returns (bool success, V3Struct.ParsedV3Quote memory v3ParsedQuote, bytes memory signedQuoteData)
@@ -211,7 +220,19 @@ library V3Parser {
         success = true;
     }
 
-    function parseAuthDataAndVerifyCertType(bytes memory rawAuthData, address pemCertLibAddr)
+    /**
+     * @dev see {V3Struct.ECDSAQuoteV3AuthData} for an overview of the struct
+     * [0:64] bytes: ecdsa256BitSignature
+     * [64:128] bytes: ecdsaAttestationKey
+     * [128:512] bytes: qeReport
+     * [512:576] bytes: qeReportSignature
+     * [576:578] bytes: qeAuthDataSize (Y)
+     * [578:578+Y] bytes: qeAuthData
+     * [578+Y:580+Y] bytes: certType
+     * [580+Y:584+Y] bytes: certSize (Z)
+     * [584+Y:584+Y+Z] bytes: certData
+     */
+    function parseAuthDataAndVerifyCertType(bytes memory rawAuthData)
         private
         pure
         returns (bool success, V3Struct.ECDSAQuoteV3AuthData memory authDataV3)
@@ -222,7 +243,10 @@ library V3Parser {
 
         uint256 offset = 578 + qeAuthData.parsedDataSize;
         V3Struct.CertificationData memory cert;
+
         cert.certType = uint16(littleEndianDecode(rawAuthData.substring(offset, 2)));
+        // TODO: support multiple cert type
+        // Ref: https://github.com/intel/SGXDataCenterAttestationPrimitives/blob/39989a42bbbb0c968153a47254b6de79a27eb603/QuoteGeneration/quote_wrapper/common/inc/sgx_quote_3.h#L57-L66
         if (cert.certType < 1 || cert.certType > 5) {
             return (false, authDataV3);
         }

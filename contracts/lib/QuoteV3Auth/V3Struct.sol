@@ -2,6 +2,7 @@
 pragma solidity ^0.8.0;
 
 library V3Struct {
+    /// @dev https://github.com/intel/SGX-TDX-DCAP-QuoteVerificationLibrary/blob/16b7291a7a86e486fdfcf1dfb4be885c0cc00b4e/Src/AttestationLibrary/src/QuoteVerification/QuoteStructures.h#L42-L53
     struct Header {
         bytes2 version;
         bytes2 attestationKeyType;
@@ -12,6 +13,7 @@ library V3Struct {
         bytes20 userData;
     }
 
+    /// @dev https://github.com/intel/SGX-TDX-DCAP-QuoteVerificationLibrary/blob/16b7291a7a86e486fdfcf1dfb4be885c0cc00b4e/Src/AttestationLibrary/src/QuoteVerification/QuoteStructures.h#L63-L80
     struct EnclaveReport {
         bytes16 cpuSvn;
         bytes4 miscSelect;
@@ -27,17 +29,20 @@ library V3Struct {
         bytes reportData; // 64 bytes - For QEReports, this contains the hash of the concatenation of attestation key and QEAuthData
     }
 
+    /// @dev https://github.com/intel/SGX-TDX-DCAP-QuoteVerificationLibrary/blob/16b7291a7a86e486fdfcf1dfb4be885c0cc00b4e/Src/AttestationLibrary/src/QuoteVerification/QuoteStructures.h#L128-L133
     struct QEAuthData {
         uint16 parsedDataSize;
         bytes data;
     }
 
+    /// @dev https://github.com/intel/SGX-TDX-DCAP-QuoteVerificationLibrary/blob/16b7291a7a86e486fdfcf1dfb4be885c0cc00b4e/Src/AttestationLibrary/src/QuoteVerification/QuoteStructures.h#L135-L141
     struct CertificationData {
         uint16 certType;
         uint32 certDataSize;
         bytes[3] decodedCertDataArray; // base64 decoded cert bytes array
     }
 
+    /// @dev https://github.com/intel/SGX-TDX-DCAP-QuoteVerificationLibrary/blob/16b7291a7a86e486fdfcf1dfb4be885c0cc00b4e/Src/AttestationLibrary/src/QuoteVerification/QuoteStructures.h#L153-L164
     struct ECDSAQuoteV3AuthData {
         bytes ecdsa256BitSignature; // 64 bytes
         bytes ecdsaAttestationKey; // 64 bytes
