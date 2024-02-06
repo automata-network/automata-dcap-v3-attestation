@@ -19,7 +19,7 @@ contract DeployDCAPScript is Script {
     function deployPemCertLib() public {
         uint256 deployerKey = vm.envUint("PRIVATE_KEY");
         vm.broadcast(deployerKey);
-        
+
         PEMCertChainLib pemCertLib = new PEMCertChainLib();
 
         console.log("[LOG] PEMCertChainLib deployed to %s", address(pemCertLib));
@@ -31,10 +31,8 @@ contract DeployDCAPScript is Script {
         address pemCertLib = vm.envAddress("PEMCERT_LIB_ADDRESS");
         vm.broadcast(deployerKey);
 
-        AutomataDcapV3Attestation attestation = new AutomataDcapV3Attestation(
-            address(sigVerifyLib),
-            address(pemCertLib)
-        );
+        AutomataDcapV3Attestation attestation =
+            new AutomataDcapV3Attestation(address(sigVerifyLib), address(pemCertLib));
 
         console.log("[LOG] AutomataDcapV3Attestation deployed to %s", address(attestation));
     }
