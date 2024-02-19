@@ -1,19 +1,19 @@
 //SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 
-import {IAttestation} from "./interfaces/IAttestation.sol";
-import {PEMCertChainBase, X509CertObj, PCKCertTCB} from "./lib/PEMCertChainBase.sol";
+import {IAttestation} from "../interfaces/IAttestation.sol";
+import {PEMCertChainBase, X509CertObj, PCKCertTCB} from "../base/PEMCertChainBase.sol";
 
 // Internal Libraries
 import {Base64, LibString} from "solady/Milady.sol";
-import {BytesUtils} from "./utils/BytesUtils.sol";
-import {V3Struct} from "./lib/QuoteV3Auth/V3Struct.sol";
-import {V3Parser} from "./lib/QuoteV3Auth/V3Parser.sol";
-import {TCBInfoStruct} from "./lib/TCBInfoStruct.sol";
-import {EnclaveIdStruct} from "./lib/EnclaveIdStruct.sol";
+import {BytesUtils} from "../utils/BytesUtils.sol";
+import {V3Struct} from "./QuoteV3Auth/V3Struct.sol";
+import {V3Parser} from "./QuoteV3Auth/V3Parser.sol";
+// import {TCBInfoStruct} from "./lib/TCBInfoStruct.sol";
+// import {EnclaveIdStruct} from "./lib/EnclaveIdStruct.sol";
 
 // External Libraries
-import {ISigVerifyLib} from "./interfaces/ISigVerifyLib.sol";
+import {ISigVerifyLib} from "../interfaces/ISigVerifyLib.sol";
 
 contract AutomataDcapV3Attestation is IAttestation, PEMCertChainBase {
     using BytesUtils for bytes;
