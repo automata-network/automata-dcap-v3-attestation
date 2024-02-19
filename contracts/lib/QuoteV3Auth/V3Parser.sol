@@ -245,8 +245,6 @@ library V3Parser {
         V3Struct.CertificationData memory cert;
 
         cert.certType = uint16(littleEndianDecode(rawAuthData.substring(offset, 2)));
-        // TODO: support multiple cert type
-        // Ref: https://github.com/intel/SGXDataCenterAttestationPrimitives/blob/39989a42bbbb0c968153a47254b6de79a27eb603/QuoteGeneration/quote_wrapper/common/inc/sgx_quote_3.h#L57-L66
         if (cert.certType < 1 || cert.certType > 5) {
             return (false, authDataV3);
         }

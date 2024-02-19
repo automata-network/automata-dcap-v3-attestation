@@ -1,26 +1,24 @@
 //SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 
-import {V3Struct} from "./lib/QuoteV3Auth/V3Struct.sol";
-import {V3Parser} from "./lib/QuoteV3Auth/V3Parser.sol";
-import {IPEMCertChainLib} from "./lib/interfaces/IPEMCertChainLib.sol";
-import {PEMCertChainLib} from "./lib/PEMCertChainLib.sol";
-import {TCBInfoStruct} from "./lib/TCBInfoStruct.sol";
-import {EnclaveIdStruct} from "./lib/EnclaveIdStruct.sol";
 import {IAttestation} from "./interfaces/IAttestation.sol";
+import {PEMCertChainBase, X509CertObj, PCKCertTCB} from "./lib/PEMCertChainBase.sol";
 
 // Internal Libraries
-import {Base64, LibString} from "solady/src/Milady.sol";
+import {Base64, LibString} from "solady/Milady.sol";
 import {BytesUtils} from "./utils/BytesUtils.sol";
+import {V3Struct} from "./lib/QuoteV3Auth/V3Struct.sol";
+import {V3Parser} from "./lib/QuoteV3Auth/V3Parser.sol";
+import {TCBInfoStruct} from "./lib/TCBInfoStruct.sol";
+import {EnclaveIdStruct} from "./lib/EnclaveIdStruct.sol";
 
 // External Libraries
 import {ISigVerifyLib} from "./interfaces/ISigVerifyLib.sol";
 
-contract AutomataDcapV3Attestation is IAttestation {
+contract AutomataDcapV3Attestation is IAttestation, PEMCertChainBase {
     using BytesUtils for bytes;
 
     ISigVerifyLib public immutable sigVerifyLib;
-    IPEMCertChainLib public immutable pemCertLib;
 
     // https://github.com/intel/SGXDataCenterAttestationPrimitives/blob/e7604e02331b3377f3766ed3653250e03af72d45/QuoteVerification/QVL/Src/AttestationLibrary/src/CertVerification/X509Constants.h#L64
     uint256 constant CPUSVN_LENGTH = 16;
@@ -35,21 +33,10 @@ contract AutomataDcapV3Attestation is IAttestation {
     mapping(bytes32 enclave => bool trusted) private trustedUserMrEnclave;
     mapping(bytes32 signer => bool trusted) private trustedUserMrSigner;
 
-    // Quote Collateral Configuration
-
-    // Index definition:
-    // 0 = Quote PCKCrl
-    // 1 = RootCrl
-    mapping(uint256 idx => mapping(bytes serialNum => bool revoked)) private serialNumIsRevoked;
-    // fmspc => tcbInfo
-    mapping(string fmspc => TCBInfoStruct.TCBInfo tcbInfo) public tcbInfo;
-    EnclaveIdStruct.EnclaveId public qeIdentity;
-
     address public owner;
 
-    constructor(address sigVerifyLibAddr, address pemCertLibAddr) {
+    constructor(address sigVerifyLibAddr, address pckHelperAddr) PEMCertChainBase(pckHelperAddr) {
         sigVerifyLib = ISigVerifyLib(sigVerifyLibAddr);
-        pemCertLib = PEMCertChainLib(pemCertLibAddr);
         owner = msg.sender;
     }
 
@@ -64,37 +51,6 @@ contract AutomataDcapV3Attestation is IAttestation {
 
     function setMrEnclave(bytes32 _mrEnclave, bool _trusted) external onlyOwner {
         trustedUserMrEnclave[_mrEnclave] = _trusted;
-    }
-
-    function addRevokedCertSerialNum(uint256 index, bytes[] calldata serialNumBatch) external onlyOwner {
-        for (uint256 i = 0; i < serialNumBatch.length; i++) {
-            if (serialNumIsRevoked[index][serialNumBatch[i]]) {
-                continue;
-            }
-            serialNumIsRevoked[index][serialNumBatch[i]] = true;
-        }
-    }
-
-    function removeRevokedCertSerialNum(uint256 index, bytes[] calldata serialNumBatch) external onlyOwner {
-        for (uint256 i = 0; i < serialNumBatch.length; i++) {
-            if (!serialNumIsRevoked[index][serialNumBatch[i]]) {
-                continue;
-            }
-            delete serialNumIsRevoked[index][serialNumBatch[i]];
-        }
-    }
-
-    function configureTcbInfoJson(string calldata fmspc, TCBInfoStruct.TCBInfo calldata tcbInfoInput)
-        external
-        onlyOwner
-    {
-        // 2.2M gas
-        tcbInfo[fmspc] = tcbInfoInput;
-    }
-
-    function configureQeIdentityJson(EnclaveIdStruct.EnclaveId calldata qeIdentityInput) external onlyOwner {
-        // 250k gas
-        qeIdentity = qeIdentityInput;
     }
 
     function toggleLocalReportCheck() external onlyOwner {
@@ -186,198 +142,212 @@ contract AutomataDcapV3Attestation is IAttestation {
         }
 
         // Step 4: Parse Quote CertChain
-        IPEMCertChainLib.ECSha256Certificate[] memory parsedQuoteCerts;
-        TCBInfoStruct.TCBInfo memory fetchedTcbInfo;
+        X509CertObj[] memory parsedCerts;
+        PCKCertTCB memory pckTcb;
         {
-            // 536k gas
-            parsedQuoteCerts = new IPEMCertChainLib.ECSha256Certificate[](3);
-            for (uint256 i = 0; i < 3; i++) {
-                bool isPckCert = i == 0; // additional parsing for PCKCert
-                bool certDecodedSuccessfully;
-                (certDecodedSuccessfully, parsedQuoteCerts[i]) =
-                    pemCertLib.decodeCert(v3quote.v3AuthData.certification.decodedCertDataArray[i], isPckCert);
-                if (!certDecodedSuccessfully) {
+            V3Struct.CertificationData memory certification = authDataV3.certification;
+            bool certRetrievedSuccessfully;
+            bytes[] memory certs;
+            uint256 chainSize;
+            // TODO: Support other certification types
+            // Ref: https://github.com/intel/SGXDataCenterAttestationPrimitives/blob/39989a42bbbb0c968153a47254b6de79a27eb603/QuoteGeneration/quote_wrapper/common/inc/sgx_quote_3.h#L57-L66
+            if (certification.certType == 5) {
+                // 660k gas
+                chainSize = 3;
+                (certRetrievedSuccessfully, certs) = splitCertificateChain(certification.certData, chainSize);
+                if (!certRetrievedSuccessfully) {
                     return (false, retData);
                 }
             }
-        }
 
-        // Step 5: basic PCK and TCB check = 381k gas
-        {
-            string memory parsedFmspc = parsedQuoteCerts[0].pck.sgxExtension.fmspc;
-            fetchedTcbInfo = tcbInfo[parsedFmspc];
-            bool tcbConfigured = LibString.eq(parsedFmspc, fetchedTcbInfo.fmspc);
-            if (!tcbConfigured) {
-                return (false, retData);
-            }
-
-            IPEMCertChainLib.ECSha256Certificate memory pckCert = parsedQuoteCerts[0];
-            bool pceidMatched = LibString.eq(pckCert.pck.sgxExtension.pceid, fetchedTcbInfo.pceid);
-            if (!pceidMatched) {
-                return (false, retData);
-            }
-        }
-
-        // Step 6: Verify TCB Level
-        TCBInfoStruct.TCBStatus tcbStatus;
-        {
-            // 4k gas
-            bool tcbVerified;
-            (tcbVerified, tcbStatus) = _checkTcbLevels(parsedQuoteCerts[0].pck, fetchedTcbInfo);
-            if (!tcbVerified) {
-                return (false, retData);
-            }
-        }
-
-        // Step 7: Verify cert chain for PCK
-        {
-            // 660k gas (rootCA pubkey is trusted)
-            bool pckCertChainVerified = _verifyCertChain(parsedQuoteCerts);
-            if (!pckCertChainVerified) {
-                return (false, retData);
-            }
-        }
-
-        // Step 8: Verify the local attestation sig and qe report sig = 670k gas
-        {
-            bool enclaveReportSigsVerified =
-                _enclaveReportSigVerification(parsedQuoteCerts[0].pubKey, signedQuoteData, v3quote.v3AuthData);
-            if (!enclaveReportSigsVerified) {
-                return (false, retData);
-            }
-        }
-
-        retData = abi.encodePacked(sha256(abi.encode(v3quote)), tcbStatus);
-
-        return (_attestationTcbIsValid(tcbStatus), retData);
-    }
-
-    function _verifyQEReportWithIdentity(V3Struct.EnclaveReport memory quoteEnclaveReport)
-        private
-        view
-        returns (bool, EnclaveIdStruct.EnclaveIdStatus status)
-    {
-        EnclaveIdStruct.EnclaveId memory enclaveId = qeIdentity;
-        bool miscselectMatched = quoteEnclaveReport.miscSelect & enclaveId.miscselectMask == enclaveId.miscselect;
-
-        bool attributesMatched = quoteEnclaveReport.attributes & enclaveId.attributesMask == enclaveId.attributes;
-        bool mrsignerMatched = quoteEnclaveReport.mrSigner == enclaveId.mrsigner;
-
-        bool isvprodidMatched = quoteEnclaveReport.isvProdId == enclaveId.isvprodid;
-
-        bool tcbFound;
-        for (uint256 i = 0; i < enclaveId.tcbLevels.length; i++) {
-            EnclaveIdStruct.TcbLevel memory tcb = enclaveId.tcbLevels[i];
-            if (tcb.tcb.isvsvn <= quoteEnclaveReport.isvSvn) {
-                tcbFound = true;
-                status = tcb.tcbStatus;
-                break;
-            }
-        }
-        return (miscselectMatched && attributesMatched && mrsignerMatched && isvprodidMatched && tcbFound, status);
-    }
-
-    function _checkTcbLevels(IPEMCertChainLib.PCKCertificateField memory pck, TCBInfoStruct.TCBInfo memory tcb)
-        private
-        pure
-        returns (bool, TCBInfoStruct.TCBStatus status)
-    {
-        for (uint256 i = 0; i < tcb.tcbLevels.length; i++) {
-            TCBInfoStruct.TCBLevelObj memory current = tcb.tcbLevels[i];
-            bool pceSvnIsHigherOrGreater = pck.sgxExtension.pcesvn >= current.pcesvn;
-            bool cpuSvnsAreHigherOrGreater =
-                _isCpuSvnHigherOrGreater(pck.sgxExtension.sgxTcbCompSvnArr, current.sgxTcbCompSvnArr);
-            if (pceSvnIsHigherOrGreater && cpuSvnsAreHigherOrGreater) {
-                status = current.status;
-                bool tcbIsRevoked = status == TCBInfoStruct.TCBStatus.TCB_REVOKED;
-                return (!tcbIsRevoked, status);
-            }
-        }
-        return (true, TCBInfoStruct.TCBStatus.TCB_UNRECOGNIZED);
-    }
-
-    function _isCpuSvnHigherOrGreater(uint256[] memory pckCpuSvns, uint256[] memory tcbCpuSvns)
-        private
-        pure
-        returns (bool)
-    {
-        if (pckCpuSvns.length != CPUSVN_LENGTH || tcbCpuSvns.length != CPUSVN_LENGTH) {
-            return false;
-        }
-        for (uint256 i = 0; i < CPUSVN_LENGTH; i++) {
-            if (pckCpuSvns[i] < tcbCpuSvns[i]) {
-                return false;
-            }
-        }
-        return true;
-    }
-
-    function _verifyCertChain(IPEMCertChainLib.ECSha256Certificate[] memory certs) private view returns (bool) {
-        uint256 n = certs.length;
-        bool certRevoked;
-        bool certNotExpired;
-        bool verified;
-        bool certChainCanBeTrusted;
-        for (uint256 i = 0; i < n; i++) {
-            IPEMCertChainLib.ECSha256Certificate memory issuer;
-            if (i == n - 1) {
-                // rootCA
-                issuer = certs[i];
-            } else {
-                issuer = certs[i + 1];
-                if (i == n - 2) {
-                    // this cert is expected to be signed by the root
-                    certRevoked = serialNumIsRevoked[uint256(IPEMCertChainLib.CRL.ROOT)][certs[i].serialNumber];
-                } else if (certs[i].isPck) {
-                    certRevoked = serialNumIsRevoked[uint256(IPEMCertChainLib.CRL.PCK)][certs[i].serialNumber];
-                }
-                if (certRevoked) {
-                    break;
+            // 536k gas
+            parsedCerts = new X509CertObj[](chainSize);
+            for (uint256 i = 0; i < chainSize; i++) {
+                certs[i] = Base64.decode(string(certs[i]));
+                parsedCerts[i] = pckHelper.parseX509DER(certs[i]);
+                // additional parsing for PCKCert
+                if (i == 0) {
+                    pckTcb = parsePck(certs[i], parsedCerts[i].extensionPtr);
                 }
             }
-
-            certNotExpired = block.timestamp > certs[i].notBefore && block.timestamp < certs[i].notAfter;
-            if (!certNotExpired) {
-                break;
-            }
-
-            verified = sigVerifyLib.verifyES256Signature(certs[i].tbsCertificate, certs[i].signature, issuer.pubKey);
-            if (!verified) {
-                break;
-            }
-
-            bytes32 issuerPubKeyHash = keccak256(issuer.pubKey);
-
-            if (issuerPubKeyHash == ROOTCA_PUBKEY_HASH) {
-                certChainCanBeTrusted = true;
-                break;
-            }
         }
-        return !certRevoked && certNotExpired && verified && certChainCanBeTrusted;
+
+        // // Step 5: basic PCK and TCB check = 381k gas
+        // TCBInfoStruct.TCBInfo memory fetchedTcbInfo;
+        // {
+        //     string memory parsedFmspc = parsedQuoteCerts[0].pck.sgxExtension.fmspc;
+        //     fetchedTcbInfo = tcbInfo[parsedFmspc];
+        //     bool tcbConfigured = LibString.eq(parsedFmspc, fetchedTcbInfo.fmspc);
+        //     if (!tcbConfigured) {
+        //         return (false, retData);
+        //     }
+
+        //     ECSha256Certificate memory pckCert = parsedQuoteCerts[0];
+        //     bool pceidMatched = LibString.eq(pckCert.pck.sgxExtension.pceid, fetchedTcbInfo.pceid);
+        //     if (!pceidMatched) {
+        //         return (false, retData);
+        //     }
+        // }
+
+        // // Step 6: Verify TCB Level
+        // TCBInfoStruct.TCBStatus tcbStatus;
+        // {
+        //     // 4k gas
+        //     bool tcbVerified;
+        //     (tcbVerified, tcbStatus) = _checkTcbLevels(parsedQuoteCerts[0].pck, fetchedTcbInfo);
+        //     if (!tcbVerified) {
+        //         return (false, retData);
+        //     }
+        // }
+
+        // // Step 7: Verify cert chain for PCK
+        // {
+        //     // 660k gas (rootCA pubkey is trusted)
+        //     bool pckCertChainVerified = _verifyCertChain(parsedQuoteCerts);
+        //     if (!pckCertChainVerified) {
+        //         return (false, retData);
+        //     }
+        // }
+
+        // // Step 8: Verify the local attestation sig and qe report sig = 670k gas
+        // {
+        //     bool enclaveReportSigsVerified =
+        //         _enclaveReportSigVerification(parsedQuoteCerts[0].pubKey, signedQuoteData, authDataV3, qeEnclaveReport);
+        //     if (!enclaveReportSigsVerified) {
+        //         return (false, retData);
+        //     }
+        // }
+
+        // retData = abi.encodePacked(sha256(quote), tcbStatus);
+
+        // return (_attestationTcbIsValid(tcbStatus), retData);
     }
 
-    function _enclaveReportSigVerification(
-        bytes memory pckCertPubKey,
-        bytes memory signedQuoteData,
-        V3Struct.ECDSAQuoteV3AuthData memory authDataV3
-    ) private view returns (bool) {
-        V3Struct.EnclaveReport memory qeEnclaveReport = authDataV3.pckSignedQeReport;
-        bytes32 expectedAuthDataHash = bytes32(qeEnclaveReport.reportData.substring(0, 32));
-        bytes memory concatOfAttestKeyAndQeAuthData =
-            abi.encodePacked(authDataV3.ecdsaAttestationKey, authDataV3.qeAuthData.data);
-        bytes32 computedAuthDataHash = sha256(concatOfAttestKeyAndQeAuthData);
+    // function _verifyQEReportWithIdentity(V3Struct.EnclaveReport memory quoteEnclaveReport)
+    //     private
+    //     view
+    //     returns (bool, EnclaveIdStruct.EnclaveIdStatus status)
+    // {
+    //     EnclaveIdStruct.EnclaveId memory enclaveId = qeIdentity;
+    //     bool miscselectMatched = quoteEnclaveReport.miscSelect & enclaveId.miscselectMask == enclaveId.miscselect;
 
-        bool qeReportDataIsValid = expectedAuthDataHash == computedAuthDataHash;
-        if (qeReportDataIsValid) {
-            bytes memory pckSignedQeReportBytes = V3Parser.packQEReport(authDataV3.pckSignedQeReport);
-            bool qeSigVerified =
-                sigVerifyLib.verifyES256Signature(pckSignedQeReportBytes, authDataV3.qeReportSignature, pckCertPubKey);
-            bool quoteSigVerified = sigVerifyLib.verifyES256Signature(
-                signedQuoteData, authDataV3.ecdsa256BitSignature, authDataV3.ecdsaAttestationKey
-            );
-            return qeSigVerified && quoteSigVerified;
-        } else {
-            return false;
-        }
-    }
+    //     bool attributesMatched = quoteEnclaveReport.attributes & enclaveId.attributesMask == enclaveId.attributes;
+    //     bool mrsignerMatched = quoteEnclaveReport.mrSigner == enclaveId.mrsigner;
+
+    //     bool isvprodidMatched = quoteEnclaveReport.isvProdId == enclaveId.isvprodid;
+
+    //     bool tcbFound;
+    //     for (uint256 i = 0; i < enclaveId.tcbLevels.length; i++) {
+    //         EnclaveIdStruct.TcbLevel memory tcb = enclaveId.tcbLevels[i];
+    //         if (tcb.tcb.isvsvn <= quoteEnclaveReport.isvSvn) {
+    //             tcbFound = true;
+    //             status = tcb.tcbStatus;
+    //             break;
+    //         }
+    //     }
+    //     return (miscselectMatched && attributesMatched && mrsignerMatched && isvprodidMatched && tcbFound, status);
+    // }
+
+    // function _checkTcbLevels(PCKCertificateField memory pck, TCBInfoStruct.TCBInfo memory tcb)
+    //     private
+    //     pure
+    //     returns (bool, TCBInfoStruct.TCBStatus status)
+    // {
+    //     for (uint256 i = 0; i < tcb.tcbLevels.length; i++) {
+    //         TCBInfoStruct.TCBLevelObj memory current = tcb.tcbLevels[i];
+    //         bool pceSvnIsHigherOrGreater = pck.sgxExtension.pcesvn >= current.pcesvn;
+    //         bool cpuSvnsAreHigherOrGreater =
+    //             _isCpuSvnHigherOrGreater(pck.sgxExtension.sgxTcbCompSvnArr, current.sgxTcbCompSvnArr);
+    //         if (pceSvnIsHigherOrGreater && cpuSvnsAreHigherOrGreater) {
+    //             status = current.status;
+    //             bool tcbIsRevoked = status == TCBInfoStruct.TCBStatus.TCB_REVOKED;
+    //             return (!tcbIsRevoked, status);
+    //         }
+    //     }
+    //     return (true, TCBInfoStruct.TCBStatus.TCB_UNRECOGNIZED);
+    // }
+
+    // function _isCpuSvnHigherOrGreater(uint256[] memory pckCpuSvns, uint256[] memory tcbCpuSvns)
+    //     private
+    //     pure
+    //     returns (bool)
+    // {
+    //     if (pckCpuSvns.length != CPUSVN_LENGTH || tcbCpuSvns.length != CPUSVN_LENGTH) {
+    //         return false;
+    //     }
+    //     for (uint256 i = 0; i < CPUSVN_LENGTH; i++) {
+    //         if (pckCpuSvns[i] < tcbCpuSvns[i]) {
+    //             return false;
+    //         }
+    //     }
+    //     return true;
+    // }
+
+    // function _verifyCertChain(ECSha256Certificate[] memory certs) private view returns (bool) {
+    //     uint256 n = certs.length;
+    //     bool certRevoked;
+    //     bool certNotExpired;
+    //     bool verified;
+    //     bool certChainCanBeTrusted;
+    //     for (uint256 i = 0; i < n; i++) {
+    //         ECSha256Certificate memory issuer;
+    //         if (i == n - 1) {
+    //             // rootCA
+    //             issuer = certs[i];
+    //         } else {
+    //             issuer = certs[i + 1];
+    //             if (i == n - 2) {
+    //                 // this cert is expected to be signed by the root
+    //                 certRevoked = serialNumIsRevoked[uint256(CRL.ROOT)][certs[i].serialNumber];
+    //             } else if (certs[i].isPck) {
+    //                 certRevoked = serialNumIsRevoked[uint256(CRL.PCK)][certs[i].serialNumber];
+    //             }
+    //             if (certRevoked) {
+    //                 break;
+    //             }
+    //         }
+
+    //         certNotExpired = block.timestamp > certs[i].notBefore && block.timestamp < certs[i].notAfter;
+    //         if (!certNotExpired) {
+    //             break;
+    //         }
+
+    //         verified = sigVerifyLib.verifyES256Signature(certs[i].tbsCertificate, certs[i].signature, issuer.pubKey);
+    //         if (!verified) {
+    //             break;
+    //         }
+
+    //         bytes32 issuerPubKeyHash = keccak256(issuer.pubKey);
+
+    //         if (issuerPubKeyHash == ROOTCA_PUBKEY_HASH) {
+    //             certChainCanBeTrusted = true;
+    //             break;
+    //         }
+    //     }
+    //     return !certRevoked && certNotExpired && verified && certChainCanBeTrusted;
+    // }
+
+    // function _enclaveReportSigVerification(
+    //     bytes memory pckCertPubKey,
+    //     bytes memory signedQuoteData,
+    //     V3Struct.ECDSAQuoteV3AuthData memory authDataV3,
+    //     V3Struct.EnclaveReport memory qeEnclaveReport
+    // ) private view returns (bool) {
+    //     bytes32 expectedAuthDataHash = bytes32(qeEnclaveReport.reportData.substring(0, 32));
+    //     bytes memory concatOfAttestKeyAndQeAuthData =
+    //         abi.encodePacked(authDataV3.ecdsaAttestationKey, authDataV3.qeAuthData.data);
+    //     bytes32 computedAuthDataHash = sha256(concatOfAttestKeyAndQeAuthData);
+
+    //     bool qeReportDataIsValid = expectedAuthDataHash == computedAuthDataHash;
+    //     if (qeReportDataIsValid) {
+    //         bool qeSigVerified =
+    //             sigVerifyLib.verifyES256Signature(authDataV3.rawQeReport, authDataV3.qeReportSignature, pckCertPubKey);
+    //         bool quoteSigVerified = sigVerifyLib.verifyES256Signature(
+    //             signedQuoteData, authDataV3.ecdsa256BitSignature, authDataV3.ecdsaAttestationKey
+    //         );
+    //         return qeSigVerified && quoteSigVerified;
+    //     } else {
+    //         return false;
+    //     }
+    // }
 }
