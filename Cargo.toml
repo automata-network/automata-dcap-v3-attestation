@@ -1,0 +1,26 @@
+[package]
+name = "automata-dcap-v3-attestation"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+dcap-quote = { path = "./crates/dcap-quote" }
+halo2-secp256r1-circuit = { path = "./crates/halo2-secp256r1-circuit" }
+hex = "0.4.3"
+structopt = "0.3.26"
+keccak-hash = "0.10.0"
+
+[[bin]]
+name = "automata-dcap-v3-attestation"
+path = "crates/automata-dcap-v3-attestation/main.rs"
+
+[workspace]
+members = [
+    "crates/dcap-quote",
+    "crates/halo2-secp256r1-circuit",
+]
+
+
+[patch.'https://github.com/scroll-tech/halo2-lib.git']
+halo2-base = { git = "https://github.com/automata-network/halo2-lib.git", branch = "develop" }
+halo2-ecc = { git = "https://github.com/automata-network/halo2-lib.git", branch = "develop" }
