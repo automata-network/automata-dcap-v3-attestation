@@ -2,6 +2,7 @@
 pragma solidity ^0.8.0;
 
 import {IAttestation} from "../interfaces/IAttestation.sol";
+import {EnclaveIdBase, EnclaveIdTcbStatus} from "../base/EnclaveIdBase.sol";
 import {PEMCertChainBase, X509CertObj, PCKCertTCB} from "../base/PEMCertChainBase.sol";
 
 // Internal Libraries
@@ -10,12 +11,11 @@ import {BytesUtils} from "../utils/BytesUtils.sol";
 import {V3Struct} from "./QuoteV3Auth/V3Struct.sol";
 import {V3Parser} from "./QuoteV3Auth/V3Parser.sol";
 // import {TCBInfoStruct} from "./lib/TCBInfoStruct.sol";
-// import {EnclaveIdStruct} from "./lib/EnclaveIdStruct.sol";
 
 // External Libraries
 import {ISigVerifyLib} from "../interfaces/ISigVerifyLib.sol";
 
-contract AutomataDcapV3Attestation is IAttestation, PEMCertChainBase {
+contract AutomataDcapV3Attestation is IAttestation, EnclaveIdBase, PEMCertChainBase {
     using BytesUtils for bytes;
 
     ISigVerifyLib public immutable sigVerifyLib;
@@ -35,7 +35,10 @@ contract AutomataDcapV3Attestation is IAttestation, PEMCertChainBase {
 
     address public owner;
 
-    constructor(address sigVerifyLibAddr, address pckHelperAddr) PEMCertChainBase(pckHelperAddr) {
+    constructor(address sigVerifyLibAddr, address enclaveIdDaoAddr, address enclaveIdHelperAddr, address pckHelperAddr)
+        EnclaveIdBase(enclaveIdDaoAddr, enclaveIdHelperAddr)
+        PEMCertChainBase(pckHelperAddr)
+    {
         sigVerifyLib = ISigVerifyLib(sigVerifyLibAddr);
         owner = msg.sender;
     }
@@ -57,12 +60,7 @@ contract AutomataDcapV3Attestation is IAttestation, PEMCertChainBase {
         checkLocalEnclaveReport = !checkLocalEnclaveReport;
     }
 
-    function _attestationTcbIsValid(TCBInfoStruct.TCBStatus status) internal pure virtual returns (bool valid) {
-        return status == TCBInfoStruct.TCBStatus.OK || status == TCBInfoStruct.TCBStatus.TCB_SW_HARDENING_NEEDED
-            || status == TCBInfoStruct.TCBStatus.TCB_CONFIGURATION_AND_SW_HARDENING_NEEDED;
-    }
-
-    function verifyAttestation(bytes calldata data) external view override returns (bool) {
+    function verifyAttestation(bytes calldata data) external override returns (bool) {
         (bool success,) = _verify(data);
         return success;
     }
@@ -99,8 +97,10 @@ contract AutomataDcapV3Attestation is IAttestation, PEMCertChainBase {
     }
 
     /// @dev if the qupte is parsed on-chain, you must explicitly pass signedQuoteData here
+    /// @dev view modifier omitted, because PCCS cache miss emits an event
+    /// @dev you can however, make a staticcall to this non-state changing method
     function _verifyParsedQuote(V3Struct.ParsedV3Quote memory v3quote, bytes memory signedQuoteData)
-        internal
+        private
         view
         returns (bool, bytes memory)
     {
@@ -125,18 +125,21 @@ contract AutomataDcapV3Attestation is IAttestation, PEMCertChainBase {
         }
 
         // Step 3: Verify enclave identity = 43k gas
-        EnclaveIdStruct.EnclaveIdStatus qeTcbStatus;
+        V3Struct.EnclaveReport memory qeEnclaveReport;
+        EnclaveIdTcbStatus qeTcbStatus;
         {
             bool verifiedEnclaveIdSuccessfully;
-            (verifiedEnclaveIdSuccessfully, qeTcbStatus) =
-                _verifyQEReportWithIdentity(v3quote.v3AuthData.pckSignedQeReport);
+            (verifiedEnclaveIdSuccessfully, qeTcbStatus) = _verifyQEReportWithIdentity(
+                qeEnclaveReport.miscSelect,
+                qeEnclaveReport.attributes,
+                qeEnclaveReport.mrSigner,
+                qeEnclaveReport.isvProdId,
+                qeEnclaveReport.isvSvn
+            );
             if (!verifiedEnclaveIdSuccessfully) {
                 return (false, retData);
             }
-            if (
-                !verifiedEnclaveIdSuccessfully
-                    || qeTcbStatus == EnclaveIdStruct.EnclaveIdStatus.SGX_ENCLAVE_REPORT_ISVSVN_REVOKED
-            ) {
+            if (!verifiedEnclaveIdSuccessfully || qeTcbStatus == EnclaveIdTcbStatus.SGX_ENCLAVE_REPORT_ISVSVN_REVOKED) {
                 return (false, retData);
             }
         }
@@ -223,10 +226,15 @@ contract AutomataDcapV3Attestation is IAttestation, PEMCertChainBase {
         // return (_attestationTcbIsValid(tcbStatus), retData);
     }
 
+    // function _attestationTcbIsValid(TCBInfoStruct.TCBStatus status) internal pure virtual returns (bool valid) {
+    //     return status == TCBInfoStruct.TCBStatus.OK || status == TCBInfoStruct.TCBStatus.TCB_SW_HARDENING_NEEDED
+    //         || status == TCBInfoStruct.TCBStatus.TCB_CONFIGURATION_AND_SW_HARDENING_NEEDED;
+    // }
+
     // function _verifyQEReportWithIdentity(V3Struct.EnclaveReport memory quoteEnclaveReport)
     //     private
     //     view
-    //     returns (bool, EnclaveIdStruct.EnclaveIdStatus status)
+    //     returns (bool, EnclaveIdStruct.EnclaveIdTcbStatus status)
     // {
     //     EnclaveIdStruct.EnclaveId memory enclaveId = qeIdentity;
     //     bool miscselectMatched = quoteEnclaveReport.miscSelect & enclaveId.miscselectMask == enclaveId.miscselect;

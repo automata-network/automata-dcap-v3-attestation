@@ -54,7 +54,7 @@ abstract contract PEMCertChainBase {
         success = true;
     }
 
-    function parsePck(bytes memory der, uint256 extensionPtr) internal pure returns (PCKCertTCB memory pckTCB) {
+    function parsePck(bytes memory der, uint256 extensionPtr) internal view returns (PCKCertTCB memory pckTCB) {
         (pckTCB.pcesvn, pckTCB.cpusvns, pckTCB.fmspcBytes, pckTCB.pceidBytes) =
             pckHelper.parsePckExtension(der, extensionPtr);
     }
