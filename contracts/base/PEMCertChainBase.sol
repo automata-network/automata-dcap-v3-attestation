@@ -4,6 +4,9 @@ pragma solidity ^0.8.0;
 import {Base64, LibString} from "solady/Milady.sol";
 import {PCKHelper, X509CertObj} from "@automata-network/on-chain-pccs/helper/PCKHelper.sol";
 
+// External Libraries
+import {ISigVerifyLib} from "../interfaces/ISigVerifyLib.sol";
+
 struct PCKCertTCB {
     uint16 pcesvn;
     uint8[] cpusvns;
@@ -12,6 +15,7 @@ struct PCKCertTCB {
 }
 
 abstract contract PEMCertChainBase {
+    ISigVerifyLib public immutable sigVerifyLib;
     PCKHelper public immutable pckHelper;
 
     string constant HEADER = "-----BEGIN CERTIFICATE-----";
@@ -19,7 +23,12 @@ abstract contract PEMCertChainBase {
     uint256 internal constant HEADER_LENGTH = 27;
     uint256 internal constant FOOTER_LENGTH = 25;
 
-    constructor(address _pckHelper) {
+    // keccak256(hex"0ba9c4c0c0c86193a3fe23d6b02cda10a8bbd4e88e48b4458561a36e705525f567918e2edc88e40d860bd0cc4ee26aacc988e505a953558c453f6b0904ae7394")
+    // the uncompressed (0x04) prefix is not included in the pubkey pre-image
+    bytes32 constant ROOTCA_PUBKEY_HASH = 0x89f72d7c488e5b53a77c23ebcb36970ef7eb5bcf6658e9b8292cfbe4703a8473;
+
+    constructor(address _sigVerifyLib, address _pckHelper) {
+        sigVerifyLib = ISigVerifyLib(_sigVerifyLib);
         pckHelper = PCKHelper(_pckHelper);
     }
 
@@ -93,5 +102,48 @@ abstract contract PEMCertChainBase {
 
         contentBytes = bytes(contentStr);
         return (true, contentBytes, endPos + FOOTER_LENGTH);
+    }
+
+    function _verifyCertChain(X509CertObj[] memory certs) internal view returns (bool) {
+        uint256 n = certs.length;
+        bool certRevoked;
+        bool certNotExpired;
+        bool verified;
+        bool certChainCanBeTrusted;
+        for (uint256 i = 0; i < n; i++) {
+            X509CertObj memory issuer;
+            if (i == n - 1) {
+                // rootCA
+                issuer = certs[i];
+            } else {
+                issuer = certs[i + 1];
+                if (i == n - 2) {
+                    // check rootCrl
+                } else if (i == 0) {
+                    // check pckCrl
+                }
+                if (certRevoked) {
+                    break;
+                }
+            }
+
+            certNotExpired = block.timestamp > certs[i].validityNotBefore && block.timestamp < certs[i].validityNotAfter;
+            if (!certNotExpired) {
+                break;
+            }
+
+            verified = sigVerifyLib.verifyES256Signature(certs[i].tbs, certs[i].signature, issuer.subjectPublicKey);
+            if (!verified) {
+                break;
+            }
+
+            bytes32 issuerPubKeyHash = keccak256(issuer.subjectPublicKey);
+
+            if (issuerPubKeyHash == ROOTCA_PUBKEY_HASH) {
+                certChainCanBeTrusted = true;
+                break;
+            }
+        }
+        return !certRevoked && certNotExpired && verified && certChainCanBeTrusted;
     }
 }
