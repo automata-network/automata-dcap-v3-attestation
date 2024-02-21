@@ -29,6 +29,9 @@ abstract contract EnclaveIdBase {
         uint16 enclaveReportIsvSvn
     ) internal returns (bool, EnclaveIdTcbStatus status) {
         EnclaveIdentityJsonObj memory idJsonObj = enclaveIdDao.getEnclaveIdentity(0, 3);
+
+        // TODO: it is prohibitively expensive to *repeateddly* parse collaterals on every call
+        // TODO: we might have to separately store these parsed collaterals on chain as well
         IdentityObj memory identity = enclaveIdHelper.parseIdentityString(idJsonObj.identityStr);
         Tcb[] memory identityTcbs = enclaveIdHelper.parseTcb(identity.rawTcbLevelsObjStr);
 

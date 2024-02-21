@@ -4,24 +4,21 @@ pragma solidity ^0.8.0;
 import {IAttestation} from "../interfaces/IAttestation.sol";
 import {EnclaveIdBase, EnclaveIdTcbStatus} from "../base/EnclaveIdBase.sol";
 import {PEMCertChainBase, X509CertObj, PCKCertTCB} from "../base/PEMCertChainBase.sol";
+import {TCBInfoBase, TcbInfoJsonObj, TCBStatus} from "../base/TCBInfoBase.sol";
 
 // Internal Libraries
 import {Base64, LibString} from "solady/Milady.sol";
 import {BytesUtils} from "../utils/BytesUtils.sol";
 import {V3Struct} from "./QuoteV3Auth/V3Struct.sol";
 import {V3Parser} from "./QuoteV3Auth/V3Parser.sol";
-// import {TCBInfoStruct} from "./lib/TCBInfoStruct.sol";
 
 // External Libraries
 import {ISigVerifyLib} from "../interfaces/ISigVerifyLib.sol";
 
-contract AutomataDcapV3Attestation is IAttestation, EnclaveIdBase, PEMCertChainBase {
+contract AutomataDcapV3Attestation is IAttestation, EnclaveIdBase, PEMCertChainBase, TCBInfoBase {
     using BytesUtils for bytes;
 
     ISigVerifyLib public immutable sigVerifyLib;
-
-    // https://github.com/intel/SGXDataCenterAttestationPrimitives/blob/e7604e02331b3377f3766ed3653250e03af72d45/QuoteVerification/QVL/Src/AttestationLibrary/src/CertVerification/X509Constants.h#L64
-    uint256 constant CPUSVN_LENGTH = 16;
 
     // keccak256(hex"0ba9c4c0c0c86193a3fe23d6b02cda10a8bbd4e88e48b4458561a36e705525f567918e2edc88e40d860bd0cc4ee26aacc988e505a953558c453f6b0904ae7394")
     // the uncompressed (0x04) prefix is not included in the pubkey pre-image
@@ -35,9 +32,17 @@ contract AutomataDcapV3Attestation is IAttestation, EnclaveIdBase, PEMCertChainB
 
     address public owner;
 
-    constructor(address sigVerifyLibAddr, address enclaveIdDaoAddr, address enclaveIdHelperAddr, address pckHelperAddr)
+    constructor(
+        address sigVerifyLibAddr,
+        address enclaveIdDaoAddr,
+        address enclaveIdHelperAddr,
+        address pckHelperAddr,
+        address tcbDaoAddr,
+        address tcbHelperAddr
+    )
         EnclaveIdBase(enclaveIdDaoAddr, enclaveIdHelperAddr)
         PEMCertChainBase(pckHelperAddr)
+        TCBInfoBase(tcbDaoAddr, tcbHelperAddr)
     {
         sigVerifyLib = ISigVerifyLib(sigVerifyLibAddr);
         owner = msg.sender;
@@ -98,6 +103,7 @@ contract AutomataDcapV3Attestation is IAttestation, EnclaveIdBase, PEMCertChainB
 
     /// @dev if the qupte is parsed on-chain, you must explicitly pass signedQuoteData here
     /// @dev view modifier omitted, because PCCS cache miss emits an event
+    /// @dev view modifier omitted, because a PCCS cache miss emits an event
     /// @dev you can however, make a staticcall to this non-state changing method
     function _verifyParsedQuote(V3Struct.ParsedV3Quote memory v3quote, bytes memory signedQuoteData)
         private
@@ -124,7 +130,7 @@ contract AutomataDcapV3Attestation is IAttestation, EnclaveIdBase, PEMCertChainB
             }
         }
 
-        // Step 3: Verify enclave identity = 43k gas
+        // Step 3: Verify enclave identity
         V3Struct.EnclaveReport memory qeEnclaveReport;
         EnclaveIdTcbStatus qeTcbStatus;
         {
@@ -145,25 +151,23 @@ contract AutomataDcapV3Attestation is IAttestation, EnclaveIdBase, PEMCertChainB
         }
 
         // Step 4: Parse Quote CertChain
+        V3Struct.CertificationData memory certification = authDataV3.certification;
         X509CertObj[] memory parsedCerts;
         PCKCertTCB memory pckTcb;
         {
-            V3Struct.CertificationData memory certification = authDataV3.certification;
             bool certRetrievedSuccessfully;
             bytes[] memory certs;
-            uint256 chainSize;
+            uint256 chainSize = 3;
             // TODO: Support other certification types
             // Ref: https://github.com/intel/SGXDataCenterAttestationPrimitives/blob/39989a42bbbb0c968153a47254b6de79a27eb603/QuoteGeneration/quote_wrapper/common/inc/sgx_quote_3.h#L57-L66
             if (certification.certType == 5) {
                 // 660k gas
-                chainSize = 3;
                 (certRetrievedSuccessfully, certs) = splitCertificateChain(certification.certData, chainSize);
                 if (!certRetrievedSuccessfully) {
                     return (false, retData);
                 }
             }
 
-            // 536k gas
             parsedCerts = new X509CertObj[](chainSize);
             for (uint256 i = 0; i < chainSize; i++) {
                 certs[i] = Base64.decode(string(certs[i]));
@@ -175,33 +179,23 @@ contract AutomataDcapV3Attestation is IAttestation, EnclaveIdBase, PEMCertChainB
             }
         }
 
-        // // Step 5: basic PCK and TCB check = 381k gas
-        // TCBInfoStruct.TCBInfo memory fetchedTcbInfo;
-        // {
-        //     string memory parsedFmspc = parsedQuoteCerts[0].pck.sgxExtension.fmspc;
-        //     fetchedTcbInfo = tcbInfo[parsedFmspc];
-        //     bool tcbConfigured = LibString.eq(parsedFmspc, fetchedTcbInfo.fmspc);
-        //     if (!tcbConfigured) {
-        //         return (false, retData);
-        //     }
-
-        //     ECSha256Certificate memory pckCert = parsedQuoteCerts[0];
-        //     bool pceidMatched = LibString.eq(pckCert.pck.sgxExtension.pceid, fetchedTcbInfo.pceid);
-        //     if (!pceidMatched) {
-        //         return (false, retData);
-        //     }
-        // }
+        // Step 5: basic PCK and TCB check
+        TcbInfoJsonObj memory tcbInfoJson;
+        {
+            bool tcbInfoFound;
+            (tcbInfoFound, tcbInfoJson) = _getTcbInfo(string(pckTcb.fmspcBytes));
+        }
 
         // // Step 6: Verify TCB Level
-        // TCBInfoStruct.TCBStatus tcbStatus;
-        // {
-        //     // 4k gas
-        //     bool tcbVerified;
-        //     (tcbVerified, tcbStatus) = _checkTcbLevels(parsedQuoteCerts[0].pck, fetchedTcbInfo);
-        //     if (!tcbVerified) {
-        //         return (false, retData);
-        //     }
-        // }
+        TCBStatus tcbStatus;
+        {
+            // 4k gas
+            bool tcbVerified;
+            (tcbVerified, tcbStatus) = _checkTcbLevels(pckTcb, tcbInfoJson);
+            if (!tcbVerified) {
+                return (false, retData);
+            }
+        }
 
         // // Step 7: Verify cert chain for PCK
         // {
@@ -229,31 +223,6 @@ contract AutomataDcapV3Attestation is IAttestation, EnclaveIdBase, PEMCertChainB
     // function _attestationTcbIsValid(TCBInfoStruct.TCBStatus status) internal pure virtual returns (bool valid) {
     //     return status == TCBInfoStruct.TCBStatus.OK || status == TCBInfoStruct.TCBStatus.TCB_SW_HARDENING_NEEDED
     //         || status == TCBInfoStruct.TCBStatus.TCB_CONFIGURATION_AND_SW_HARDENING_NEEDED;
-    // }
-
-    // function _verifyQEReportWithIdentity(V3Struct.EnclaveReport memory quoteEnclaveReport)
-    //     private
-    //     view
-    //     returns (bool, EnclaveIdStruct.EnclaveIdTcbStatus status)
-    // {
-    //     EnclaveIdStruct.EnclaveId memory enclaveId = qeIdentity;
-    //     bool miscselectMatched = quoteEnclaveReport.miscSelect & enclaveId.miscselectMask == enclaveId.miscselect;
-
-    //     bool attributesMatched = quoteEnclaveReport.attributes & enclaveId.attributesMask == enclaveId.attributes;
-    //     bool mrsignerMatched = quoteEnclaveReport.mrSigner == enclaveId.mrsigner;
-
-    //     bool isvprodidMatched = quoteEnclaveReport.isvProdId == enclaveId.isvprodid;
-
-    //     bool tcbFound;
-    //     for (uint256 i = 0; i < enclaveId.tcbLevels.length; i++) {
-    //         EnclaveIdStruct.TcbLevel memory tcb = enclaveId.tcbLevels[i];
-    //         if (tcb.tcb.isvsvn <= quoteEnclaveReport.isvSvn) {
-    //             tcbFound = true;
-    //             status = tcb.tcbStatus;
-    //             break;
-    //         }
-    //     }
-    //     return (miscselectMatched && attributesMatched && mrsignerMatched && isvprodidMatched && tcbFound, status);
     // }
 
     // function _checkTcbLevels(PCKCertificateField memory pck, TCBInfoStruct.TCBInfo memory tcb)
