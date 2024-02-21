@@ -123,12 +123,14 @@ abstract contract PEMCertChainBase {
                 issuer = certs[i];
             } else {
                 issuer = certs[i + 1];
+                bytes memory crl;
                 if (i == n - 2) {
-                    (, bytes memory rootCrl) = pcsDao.getCertificateById(CA.ROOT);
-                    certRevoked = crlHelper.serialNumberIsRevoked(certs[i].serialNumber, rootCrl);
+                    (, crl) = pcsDao.getCertificateById(CA.ROOT);
                 } else if (i == 0) {
-                    (, bytes memory pckCrl) = pcsDao.getCertificateById(CA.PLATFORM);
-                    certRevoked = crlHelper.serialNumberIsRevoked(certs[i].serialNumber, pckCrl);
+                    (, crl) = pcsDao.getCertificateById(CA.PLATFORM);
+                }
+                if (crl.length > 0) {
+                    certRevoked = crlHelper.serialNumberIsRevoked(certs[i].serialNumber, crl);
                 }
                 if (certRevoked) {
                     break;

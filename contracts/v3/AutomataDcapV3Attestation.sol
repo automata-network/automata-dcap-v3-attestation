@@ -13,6 +13,7 @@ import {V3Parser} from "./QuoteV3Auth/V3Parser.sol";
 
 contract AutomataDcapV3Attestation is IAttestation, EnclaveIdBase, PEMCertChainBase, TCBInfoBase {
     using BytesUtils for bytes;
+    using LibString for bytes;
 
     uint8 constant INVALID_EXIT_CODE = 255;
 
@@ -180,7 +181,7 @@ contract AutomataDcapV3Attestation is IAttestation, EnclaveIdBase, PEMCertChainB
         TcbInfoJsonObj memory tcbInfoJson;
         {
             bool tcbInfoFound;
-            (tcbInfoFound, tcbInfoJson) = _getTcbInfo(string(pckTcb.fmspcBytes));
+            (tcbInfoFound, tcbInfoJson) = _getTcbInfo(pckTcb.fmspcBytes.toHexStringNoPrefix());
         }
 
         // // Step 6: Verify TCB Level
