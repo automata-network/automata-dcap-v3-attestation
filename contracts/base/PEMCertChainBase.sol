@@ -3,6 +3,8 @@ pragma solidity ^0.8.0;
 
 import {Base64, LibString} from "solady/Milady.sol";
 import {PCKHelper, X509CertObj} from "@automata-network/on-chain-pccs/helper/PCKHelper.sol";
+import {X509CRLHelper} from "@automata-network/on-chain-pccs/helper/X509CRLHelper.sol";
+import {PcsDao, CA} from "@automata-network/on-chain-pccs/dao/PcsDao.sol";
 
 // External Libraries
 import {ISigVerifyLib} from "../interfaces/ISigVerifyLib.sol";
@@ -17,6 +19,8 @@ struct PCKCertTCB {
 abstract contract PEMCertChainBase {
     ISigVerifyLib public immutable sigVerifyLib;
     PCKHelper public immutable pckHelper;
+    X509CRLHelper public immutable crlHelper;
+    PcsDao public immutable pcsDao;
 
     string constant HEADER = "-----BEGIN CERTIFICATE-----";
     string constant FOOTER = "-----END CERTIFICATE-----";
@@ -27,9 +31,11 @@ abstract contract PEMCertChainBase {
     // the uncompressed (0x04) prefix is not included in the pubkey pre-image
     bytes32 constant ROOTCA_PUBKEY_HASH = 0x89f72d7c488e5b53a77c23ebcb36970ef7eb5bcf6658e9b8292cfbe4703a8473;
 
-    constructor(address _sigVerifyLib, address _pckHelper) {
+    constructor(address _sigVerifyLib, address _pckHelper, address _crlHelper, address _pcsDao) {
         sigVerifyLib = ISigVerifyLib(_sigVerifyLib);
         pckHelper = PCKHelper(_pckHelper);
+        crlHelper = X509CRLHelper(_crlHelper);
+        pcsDao = PcsDao(_pcsDao);
     }
 
     function splitCertificateChain(bytes memory pemChain, uint256 size)
@@ -118,9 +124,11 @@ abstract contract PEMCertChainBase {
             } else {
                 issuer = certs[i + 1];
                 if (i == n - 2) {
-                    // check rootCrl
+                    (, bytes memory rootCrl) = pcsDao.getCertificateById(CA.ROOT);
+                    certRevoked = crlHelper.serialNumberIsRevoked(certs[i].serialNumber, rootCrl);
                 } else if (i == 0) {
-                    // check pckCrl
+                    (, bytes memory pckCrl) = pcsDao.getCertificateById(CA.PLATFORM);
+                    certRevoked = crlHelper.serialNumberIsRevoked(certs[i].serialNumber, pckCrl);
                 }
                 if (certRevoked) {
                     break;

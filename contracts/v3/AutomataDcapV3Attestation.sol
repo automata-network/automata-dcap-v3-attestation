@@ -28,10 +28,12 @@ contract AutomataDcapV3Attestation is IAttestation, EnclaveIdBase, PEMCertChainB
         address enclaveIdHelperAddr,
         address pckHelperAddr,
         address tcbDaoAddr,
-        address tcbHelperAddr
+        address tcbHelperAddr,
+        address crlHelperAddr,
+        address pcsDaoAddr
     )
         EnclaveIdBase(enclaveIdDaoAddr, enclaveIdHelperAddr)
-        PEMCertChainBase(sigVerifyLibAddr, pckHelperAddr)
+        PEMCertChainBase(sigVerifyLibAddr, pckHelperAddr, crlHelperAddr, pcsDaoAddr)
         TCBInfoBase(tcbDaoAddr, tcbHelperAddr)
     {
         owner = msg.sender;
