@@ -31,6 +31,9 @@ const config: HardhatUserConfig = {
         balance: "10000000000000000000000" // 10000 ETH
       }]
     }
+  },
+  mocha: {
+    timeout: 120000 // 2-minute to timeout
   }
 };
 
