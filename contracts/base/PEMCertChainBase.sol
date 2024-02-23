@@ -26,6 +26,8 @@ abstract contract PEMCertChainBase {
     string constant FOOTER = "-----END CERTIFICATE-----";
     uint256 internal constant HEADER_LENGTH = 27;
     uint256 internal constant FOOTER_LENGTH = 25;
+    string constant PLATFORM_ISSUER_NAME = "Intel SGX PCK Platform CA";
+    string constant PROCESSOR_ISSUER_NAME = "Intel SGX PCK Processor CA";
 
     // keccak256(hex"0ba9c4c0c0c86193a3fe23d6b02cda10a8bbd4e88e48b4458561a36e705525f567918e2edc88e40d860bd0cc4ee26aacc988e505a953558c453f6b0904ae7394")
     // the uncompressed (0x04) prefix is not included in the pubkey pre-image
@@ -127,7 +129,14 @@ abstract contract PEMCertChainBase {
                 if (i == n - 2) {
                     (, crl) = pcsDao.getCertificateById(CA.ROOT);
                 } else if (i == 0) {
-                    (, crl) = pcsDao.getCertificateById(CA.PLATFORM);
+                    string memory issuerName = certs[i].issuerCommonName;
+                    if (LibString.eq(issuerName, PLATFORM_ISSUER_NAME)) {
+                        (, crl) = pcsDao.getCertificateById(CA.PLATFORM);
+                    } else if (LibString.eq(issuerName, PROCESSOR_ISSUER_NAME)) {
+                        (, crl) = pcsDao.getCertificateById(CA.PROCESSOR);
+                    } else {
+                        return false;
+                    }
                 }
                 if (crl.length > 0) {
                     certRevoked = crlHelper.serialNumberIsRevoked(certs[i].serialNumber, crl);
