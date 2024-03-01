@@ -250,13 +250,10 @@ contract DcapTestUtils {
     function ParseV3QuoteBytes(address pemCertChainLib, bytes memory v3QuoteBytes)
         public
         pure
-        returns (V3Struct.ParsedV3QuoteStruct memory v3quote)
+        returns (V3Struct.ParsedV3Quote memory v3quote)
     {
         bool success = false;
-        (
-            success,
-            v3quote
-        ) = V3Parser.parseInput(v3QuoteBytes, pemCertChainLib);
+        (success, v3quote,) = V3Parser.parseInput(v3QuoteBytes, pemCertChainLib);
         require(success, "V3Quote bytes parse failed");
     }
 }

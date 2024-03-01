@@ -48,7 +48,6 @@ contract CRLParser {
         uint256 lastRevokedPtr = der.firstChildOf(revokedParentPtr);
         revokedSerialNums[i] = der.bytesAt(lastRevokedPtr);
 
-
         return revokedSerialNums;
     }
 }

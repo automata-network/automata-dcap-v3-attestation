@@ -29,14 +29,11 @@ library V3Struct {
 
     struct QEAuthData {
         uint16 parsedDataSize;
-        bytes data; // todo! data.length = parsedDataSize
+        bytes data;
     }
 
     struct CertificationData {
         uint16 certType;
-         // todo! In encoded path, we need to calculate the size of certDataArray
-         // certDataSize = len(join((BEGIN_CERT, certArray[i], END_CERT) for i in 0..3))
-         // But for plain bytes path, we don't need that.
         uint32 certDataSize;
         bytes[3] decodedCertDataArray; // base64 decoded cert bytes array
     }
@@ -50,7 +47,7 @@ library V3Struct {
         CertificationData certification;
     }
 
-    struct ParsedV3QuoteStruct {
+    struct ParsedV3Quote {
         Header header;
         EnclaveReport localEnclaveReport;
         ECDSAQuoteV3AuthData v3AuthData;
