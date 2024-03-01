@@ -9,8 +9,6 @@ import {BytesUtils} from "../contracts/utils/BytesUtils.sol";
 import {Base64} from "solady/src/Milady.sol";
 import "./utils/DcapTestUtils.t.sol";
 
-import {P256Verifier} from "../lib/p256-verifier/src/P256Verifier.sol";
-
 contract AutomataDcapV3AttestationTest is Test, DcapTestUtils {
     using BytesUtils for bytes;
 
