@@ -68,6 +68,13 @@ contract AutomataDcapV3AttestationTest is Test, DcapTestUtils {
         assertTrue(verified);
     }
 
+    function testParsedQuoteAttestation() public {
+        V3Struct.ParsedV3Quote memory v3quote = ParseV3QuoteBytes(address(pemCertChainLib), sampleQuote);
+        console.logBytes(v3quote.localEnclaveReport.reportData);
+        (bool verified,) = attestation.verifyParsedQuote(v3quote);
+        assertTrue(verified);
+    }
+
     function testCRL() public {
         bytes[] memory serial = new bytes[](1);
         serial[0] = hex"2a7d4efbe5d0add11a682e797092f4b691478379";
@@ -76,6 +83,18 @@ contract AutomataDcapV3AttestationTest is Test, DcapTestUtils {
 
         vm.prank(user);
         bool verified = attestation.verifyAttestation(sampleQuote);
+        assertTrue(!verified);
+    }
+
+    function testCRLWithParsedQuote() public {
+        bytes[] memory serial = new bytes[](1);
+        serial[0] = hex"2a7d4efbe5d0add11a682e797092f4b691478379";
+        vm.prank(admin);
+        attestation.addRevokedCertSerialNum(uint256(0), serial);
+
+        vm.prank(user);
+        V3Struct.ParsedV3Quote memory v3quote = ParseV3QuoteBytes(address(pemCertChainLib), sampleQuote);
+        (bool verified,) = attestation.verifyParsedQuote(v3quote);
         assertTrue(!verified);
     }
 }

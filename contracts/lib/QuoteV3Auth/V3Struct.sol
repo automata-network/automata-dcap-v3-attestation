@@ -28,25 +28,28 @@ library V3Struct {
     }
 
     struct QEAuthData {
-        // avoid uint256 -> uint16 conversion to save gas
-        uint256 parsedDataSize;
+        uint16 parsedDataSize;
         bytes data;
     }
 
     struct CertificationData {
-        // avoid uint256 -> uint16 conversion to save gas
-        uint256 certType;
-        // avoid uint256 -> uint32 conversion to save gas
-        uint256 certDataSize;
-        bytes certData;
+        uint16 certType;
+        uint32 certDataSize;
+        bytes[3] decodedCertDataArray; // base64 decoded cert bytes array
     }
 
     struct ECDSAQuoteV3AuthData {
         bytes ecdsa256BitSignature; // 64 bytes
         bytes ecdsaAttestationKey; // 64 bytes
-        bytes rawQeReport; // 384 bytes
+        EnclaveReport pckSignedQeReport; // 384 bytes
         bytes qeReportSignature; // 64 bytes
         QEAuthData qeAuthData;
         CertificationData certification;
+    }
+
+    struct ParsedV3Quote {
+        Header header;
+        EnclaveReport localEnclaveReport;
+        ECDSAQuoteV3AuthData v3AuthData;
     }
 }

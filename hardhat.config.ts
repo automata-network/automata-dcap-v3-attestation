@@ -16,6 +16,7 @@ const config: HardhatUserConfig = {
         runs: Math.pow(2, 32) - 1
       },
       viaIR: true
+    }
   },
   networks: {
     hardhat: {

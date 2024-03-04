@@ -7,7 +7,6 @@ import "../forge-test/utils/DcapTestUtils.t.sol";
 import "./utils/CRLParser.s.sol";
 
 contract ConfigureDcapAttestationScript is Script, DcapTestUtils, CRLParser {
-
     string internal constant defaultTcbInfoPath = "contracts/assets/0923/tcbInfo.json";
     string internal constant defaultQeIdPath = "contracts/assets/0923/identity.json";
     address dcapAttestationAddr = vm.envAddress("DCAP_ATTESTATION_ADDRESS");

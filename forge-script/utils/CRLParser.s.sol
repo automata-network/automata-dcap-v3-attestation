@@ -45,8 +45,8 @@ contract CRLParser {
             revokedSerialNums[i++] = der.bytesAt(revokedPtr);
             console.logBytes(der.bytesAt(revokedPtr));
         }
-        uint256 revokedPtr = der.firstChildOf(revokedParentPtr);
-        revokedSerialNums[i] = der.bytesAt(revokedPtr);
+        uint256 lastRevokedPtr = der.firstChildOf(revokedParentPtr);
+        revokedSerialNums[i] = der.bytesAt(lastRevokedPtr);
 
         return revokedSerialNums;
     }

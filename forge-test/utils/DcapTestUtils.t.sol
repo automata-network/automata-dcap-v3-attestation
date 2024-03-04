@@ -1,9 +1,13 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity ^0.8.13;
 
+import {V3Struct} from "../../contracts/lib/QuoteV3Auth/V3Struct.sol";
+import {V3Parser} from "../../contracts/lib/QuoteV3Auth/V3Parser.sol";
+import {IPEMCertChainLib, PEMCertChainLib} from "../../contracts/lib/PEMCertChainLib.sol";
 import {TCBInfoStruct} from "../../contracts/lib/TCBInfoStruct.sol";
 import {EnclaveIdStruct} from "../../contracts/lib/EnclaveIdStruct.sol";
 import {JSONParserLib, LibString} from "solady/src/Milady.sol";
+import {Base64} from "solady/src/Milady.sol";
 
 contract DcapTestUtils {
     using JSONParserLib for JSONParserLib.Item;
@@ -241,5 +245,15 @@ contract DcapTestUtils {
             r[i] = bytes1(_fromHexChar(uint8(ss[2 * i])) * 16 + _fromHexChar(uint8(ss[2 * i + 1])));
         }
         return r;
+    }
+
+    function ParseV3QuoteBytes(address pemCertChainLib, bytes memory v3QuoteBytes)
+        public
+        pure
+        returns (V3Struct.ParsedV3Quote memory v3quote)
+    {
+        bool success = false;
+        (success, v3quote,) = V3Parser.parseInput(v3QuoteBytes, pemCertChainLib);
+        require(success, "V3Quote bytes parse failed");
     }
 }
