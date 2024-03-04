@@ -1,0 +1,17 @@
+[package]
+name = "dcap-quote"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+base64 = "0.21.7"
+ethereum-types = "0.14.1"
+hex = "0.4.3"
+keccak-hash = "0.10.0"
+lazy_static = "1.4.0"
+p256 = "0.13.2"
+rand_core = "0.6.4"
+ring = "0.17.7"
+sha2 = "0.10.8"

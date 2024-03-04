@@ -28,6 +28,7 @@ cp .env.example .env
 Compile the contract:
 
 ```bash
+forge install
 forge build
 ```
 
