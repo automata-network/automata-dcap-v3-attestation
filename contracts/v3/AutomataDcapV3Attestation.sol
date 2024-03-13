@@ -15,6 +15,7 @@ contract AutomataDcapV3Attestation is IAttestation, EnclaveIdBase, PEMCertChainB
     using BytesUtils for bytes;
     using LibString for bytes;
 
+    // TODO: invalid exit code definitions here...
     uint8 constant INVALID_EXIT_CODE = 255;
 
     bool private checkLocalEnclaveReport;
@@ -57,12 +58,12 @@ contract AutomataDcapV3Attestation is IAttestation, EnclaveIdBase, PEMCertChainB
         checkLocalEnclaveReport = !checkLocalEnclaveReport;
     }
 
-    function verifyAttestation(bytes calldata data) external override returns (bool success, uint256 exitCode) {
-        (success, exitCode) = _verify(data);
+    function verifyAttestation(bytes calldata data) external override returns (bool, uint256) {
+        return _verify(data);
     }
 
     /// --------------- validate parsed quote ---------------
-    function verifyParsedQuote(V3Struct.ParsedV3Quote calldata v3quote) external view returns (bool, bytes memory) {
+    function verifyParsedQuote(V3Struct.ParsedV3Quote calldata v3quote) external returns (bool, uint256) {
         return _verifyParsedQuote(v3quote, bytes(""));
     }
 
@@ -84,37 +85,31 @@ contract AutomataDcapV3Attestation is IAttestation, EnclaveIdBase, PEMCertChainB
     /// --------------------------------
     /// @dev view modifier omitted, because a PCCS cache miss emits an event
     /// @dev you can however, make a staticcall to this non-state changing method
-    function _verify(bytes calldata quote) private view returns (bool, bytes memory) {
-        // Step 1: Parse the quote input = 152k gas
-        (
-            bool successful,
-            ,
-            V3Struct.EnclaveReport memory localEnclaveReport,
-            bytes memory signedQuoteData,
-            V3Struct.ECDSAQuoteV3AuthData memory authDataV3
-        ) = V3Parser.parseInput(quote);
+    function _verify(bytes calldata quote) private returns (bool, uint256) {
+        // Parse the quote input
+        (bool successful, V3Struct.ParsedV3Quote memory parsedV3Quote, bytes memory signedQuoteData) =
+            V3Parser.parseInput(quote);
         if (!successful) {
-            return (false, abi.encodePacked(INVALID_EXIT_CODE));
+            return (false, INVALID_EXIT_CODE);
         }
         return _verifyParsedQuote(parsedV3Quote, signedQuoteData);
     }
 
     /// @dev if the qupte is parsed on-chain, you must explicitly pass signedQuoteData here
-    /// @dev view modifier omitted, because PCCS cache miss emits an event
     /// @dev view modifier omitted, because a PCCS cache miss emits an event
     /// @dev you can however, make a staticcall to this non-state changing method
     function _verifyParsedQuote(V3Struct.ParsedV3Quote memory v3quote, bytes memory signedQuoteData)
         private
-        view
-        returns (bool, bytes memory)
+        returns (bool, uint256)
     {
-        bytes memory retData = abi.encodePacked(INVALID_EXIT_CODE);
+        uint256 exitCode = INVALID_EXIT_CODE;
 
         // Step 0: Only validate the parsed quote if provided off-chain (gas-saving)
         if (signedQuoteData.length == 0) {
             signedQuoteData = V3Parser.validateParsedInput(v3quote);
-        
-        // Step 2: Verify application enclave report MRENCLAVE and MRSIGNER
+        }
+
+        // Step 1: Verify application enclave report MRENCLAVE and MRSIGNER
         {
             if (checkLocalEnclaveReport) {
                 // 4k gas
@@ -127,11 +122,11 @@ contract AutomataDcapV3Attestation is IAttestation, EnclaveIdBase, PEMCertChainB
             }
         }
 
-        // Step 3: Verify enclave identity
+        // Step 2: Verify enclave identity
         V3Struct.EnclaveReport memory qeEnclaveReport;
         {
             EnclaveIdTcbStatus qeTcbStatus;
-            qeEnclaveReport = V3Parser.parseEnclaveReport(authDataV3.rawQeReport);
+            qeEnclaveReport = v3quote.v3AuthData.pckSignedQeReport;
             bool verifiedEnclaveIdSuccessfully;
             (verifiedEnclaveIdSuccessfully, qeTcbStatus) = _verifyQEReportWithIdentity(
                 qeEnclaveReport.miscSelect,
@@ -148,43 +143,31 @@ contract AutomataDcapV3Attestation is IAttestation, EnclaveIdBase, PEMCertChainB
             }
         }
 
-        // Step 4: Parse Quote CertChain
-        V3Struct.CertificationData memory certification = authDataV3.certification;
+        // Step 3: Parse Quote CertChain
+        V3Struct.CertificationData memory certification = v3quote.v3AuthData.certification;
         X509CertObj[] memory parsedCerts;
         PCKCertTCB memory pckTcb;
         {
-            bool certRetrievedSuccessfully;
-            bytes[] memory certs;
-            uint256 chainSize = 3;
-            // TODO: Support other certification types
-            // Ref: https://github.com/intel/SGXDataCenterAttestationPrimitives/blob/39989a42bbbb0c968153a47254b6de79a27eb603/QuoteGeneration/quote_wrapper/common/inc/sgx_quote_3.h#L57-L66
-            if (certification.certType == 5) {
-                // 660k gas
-                (certRetrievedSuccessfully, certs) = splitCertificateChain(certification.certData, chainSize);
-                if (!certRetrievedSuccessfully) {
-                    return (false, exitCode);
-                }
-            }
-
+            bytes[] memory certs = certification.decodedCertDataArray;
+            uint256 chainSize = certs.length;
             parsedCerts = new X509CertObj[](chainSize);
             for (uint256 i = 0; i < chainSize; i++) {
-                certs[i] = Base64.decode(string(certs[i]));
                 parsedCerts[i] = pckHelper.parseX509DER(certs[i]);
                 // additional parsing for PCKCert
                 if (i == 0) {
-                    pckTcb = parsePck(certs[i], parsedCerts[i].extensionPtr);
+                    pckTcb = parsePck(certs[0], parsedCerts[0].extensionPtr);
                 }
             }
         }
 
-        // Step 5: basic PCK and TCB check
+        // Step 4: basic PCK and TCB check
         TcbInfoJsonObj memory tcbInfoJson;
         {
             bool tcbInfoFound;
             (tcbInfoFound, tcbInfoJson) = _getTcbInfo(pckTcb.fmspcBytes.toHexStringNoPrefix());
         }
 
-        // // Step 6: Verify TCB Level
+        // Step 5: Verify TCB Level
         TCBStatus tcbStatus;
         {
             // 4k gas
@@ -195,7 +178,7 @@ contract AutomataDcapV3Attestation is IAttestation, EnclaveIdBase, PEMCertChainB
             }
         }
 
-        // Step 7: Verify cert chain only for certType == 5
+        // Step 6: Verify cert chain only for certType == 5
         // this is because the PCK Certificate Chain is not obtained directly from on-chain PCCS
         // which is untrusted and requires validation
         if (certification.certType == 5) {
@@ -205,10 +188,10 @@ contract AutomataDcapV3Attestation is IAttestation, EnclaveIdBase, PEMCertChainB
             }
         }
 
-        // Step 8: Verify the local attestation sig and qe report sig = 670k gas
+        // Step 7: Verify the local attestation sig and qe report sig = 670k gas
         {
             bool enclaveReportSigsVerified = _enclaveReportSigVerification(
-                parsedCerts[0].subjectPublicKey, signedQuoteData, authDataV3, qeEnclaveReport
+                parsedCerts[0].subjectPublicKey, signedQuoteData, v3quote.v3AuthData, qeEnclaveReport
             );
             if (!enclaveReportSigsVerified) {
                 return (false, exitCode);
@@ -238,8 +221,9 @@ contract AutomataDcapV3Attestation is IAttestation, EnclaveIdBase, PEMCertChainB
 
         bool qeReportDataIsValid = expectedAuthDataHash == computedAuthDataHash;
         if (qeReportDataIsValid) {
+            bytes memory pckSignedQeReportBytes = V3Parser.packQEReport(authDataV3.pckSignedQeReport);
             bool qeSigVerified =
-                sigVerifyLib.verifyES256Signature(authDataV3.rawQeReport, authDataV3.qeReportSignature, pckCertPubKey);
+                sigVerifyLib.verifyES256Signature(pckSignedQeReportBytes, authDataV3.qeReportSignature, pckCertPubKey);
             bool quoteSigVerified = sigVerifyLib.verifyES256Signature(
                 signedQuoteData, authDataV3.ecdsa256BitSignature, authDataV3.ecdsaAttestationKey
             );

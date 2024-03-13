@@ -39,7 +39,7 @@ library V3Struct {
     struct CertificationData {
         uint16 certType;
         uint32 certDataSize;
-        bytes[3] decodedCertDataArray; // base64 decoded cert bytes array
+        bytes[] decodedCertDataArray; // base64 decoded cert bytes array
     }
 
     /// @dev https://github.com/intel/SGX-TDX-DCAP-QuoteVerificationLibrary/blob/16b7291a7a86e486fdfcf1dfb4be885c0cc00b4e/Src/AttestationLibrary/src/QuoteVerification/QuoteStructures.h#L153-L164

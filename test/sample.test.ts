@@ -45,9 +45,9 @@ describe("AutomataDcapV3Attestation sample", () => {
         
         // use a staticcall so we are able to get the return values of our non-state changing function call
         const res = await attestation.verifyAttestation.staticCall(quote);
-        expect(res.success).to.be.true;
+        expect(res[0]).to.be.true;
 
-        console.log(`exitCode: ${res.exitCode}`);
+        console.log(`exitCode: ${res[1]}`);
     })
 
     // TODO: add more test cases here...

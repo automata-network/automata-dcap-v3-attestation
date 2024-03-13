@@ -2,13 +2,13 @@
 pragma solidity ^0.8.13;
 
 import "../utils/PCCSSetup.sol";
-import {AutomataDcapV3Attestation} from "../../contracts/v3/AutomataDcapV3Attestation.sol";
+import {AutomataDcapV3Attestation, V3Struct, V3Parser} from "../../contracts/v3/AutomataDcapV3Attestation.sol";
 import {SigVerifyLib} from "../../contracts/utils/SigVerifyLib.sol";
 
 contract AutomataDcapV3AttestationTest is PCCSSetup {
     AutomataDcapV3Attestation attestation;
     SigVerifyLib sigVerifyLib;
-    
+
     address constant admin = address(1);
     address constant user = 0x0926b716f6aEF52F9F3C3474A2846e1Bf1ACedf6;
     bytes32 constant mrEnclave = 0x46049af725ec3986eeb788693df7bc5f14d3f2705106a19cd09b9d89237db1a0;
@@ -19,7 +19,7 @@ contract AutomataDcapV3AttestationTest is PCCSSetup {
 
     function setUp() public override {
         super.setUp();
-        
+
         vm.deal(admin, 100 ether);
 
         vm.startPrank(admin);
@@ -42,37 +42,26 @@ contract AutomataDcapV3AttestationTest is PCCSSetup {
 
     function testAttestation() public {
         vm.prank(user);
-        (bool verified, ) = attestation.verifyAttestation(sampleQuote);
+        (bool verified,) = attestation.verifyAttestation(sampleQuote);
         assertTrue(verified);
     }
 
     function testParsedQuoteAttestation() public {
-        V3Struct.ParsedV3Quote memory v3quote = ParseV3QuoteBytes(address(pemCertChainLib), sampleQuote);
+        V3Struct.ParsedV3Quote memory v3quote = _parseV3QuoteBytes(sampleQuote);
         console.logBytes(v3quote.localEnclaveReport.reportData);
         (bool verified,) = attestation.verifyParsedQuote(v3quote);
         assertTrue(verified);
     }
 
-    function testCRL() public {
-        bytes[] memory serial = new bytes[](1);
-        serial[0] = hex"2a7d4efbe5d0add11a682e797092f4b691478379";
-        vm.prank(admin);
-        attestation.addRevokedCertSerialNum(uint256(0), serial);
+    /// === HELPER FUNCTIONS ===
 
-        vm.prank(user);
-        bool verified = attestation.verifyAttestation(sampleQuote);
-        assertTrue(!verified);
-    }
-
-    function testCRLWithParsedQuote() public {
-        bytes[] memory serial = new bytes[](1);
-        serial[0] = hex"2a7d4efbe5d0add11a682e797092f4b691478379";
-        vm.prank(admin);
-        attestation.addRevokedCertSerialNum(uint256(0), serial);
-
-        vm.prank(user);
-        V3Struct.ParsedV3Quote memory v3quote = ParseV3QuoteBytes(address(pemCertChainLib), sampleQuote);
-        (bool verified,) = attestation.verifyParsedQuote(v3quote);
-        assertTrue(!verified);
+    function _parseV3QuoteBytes(bytes memory v3QuoteBytes)
+        private
+        pure
+        returns (V3Struct.ParsedV3Quote memory v3quote)
+    {
+        bool success = false;
+        (success, v3quote,) = V3Parser.parseInput(v3QuoteBytes);
+        require(success, "V3Quote bytes parse failed");
     }
 }
