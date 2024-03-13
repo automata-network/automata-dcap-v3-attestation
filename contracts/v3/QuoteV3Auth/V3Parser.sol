@@ -2,7 +2,8 @@
 pragma solidity ^0.8.0;
 
 import {BytesUtils} from "../../utils/BytesUtils.sol";
-import {Base64, LibString} from "solady/Milady.sol";
+import {LibString} from "solady/utils/LibString.sol";
+import {Base64} from "solady/utils/Base64.sol";
 import {V3Struct} from "./V3Struct.sol";
 
 library V3Parser {

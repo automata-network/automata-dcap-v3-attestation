@@ -14,15 +14,7 @@ const {
 } = process.env;
 
 async function main() {
-  const sigVerifyLib = await ethers.deployContract("SigVerifyLib", [], {});
-  await sigVerifyLib.waitForDeployment();
-  const sigVerifyLibAddr = await sigVerifyLib.getAddress();
-  console.log("sigVerifyLib address:", sigVerifyLibAddr);
-
-  console.log(ENCLAVE_IDENTITY_DAO_PORTAL);
-  
   const attestation = await ethers.deployContract("AutomataDcapV3Attestation", [
-    sigVerifyLibAddr,
     ENCLAVE_IDENTITY_DAO_PORTAL,
     ENCLAVE_IDENTITY_HELPER,
     X509_HELPER,

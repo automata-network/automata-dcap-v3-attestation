@@ -3,11 +3,9 @@ pragma solidity ^0.8.13;
 
 import "../utils/PCCSSetup.sol";
 import {AutomataDcapV3Attestation, V3Struct, V3Parser} from "../../contracts/v3/AutomataDcapV3Attestation.sol";
-import {SigVerifyLib} from "../../contracts/utils/SigVerifyLib.sol";
 
 contract AutomataDcapV3AttestationTest is PCCSSetup {
     AutomataDcapV3Attestation attestation;
-    SigVerifyLib sigVerifyLib;
 
     address constant admin = address(1);
     address constant user = 0x0926b716f6aEF52F9F3C3474A2846e1Bf1ACedf6;
@@ -23,16 +21,8 @@ contract AutomataDcapV3AttestationTest is PCCSSetup {
         vm.deal(admin, 100 ether);
 
         vm.startPrank(admin);
-        sigVerifyLib = new SigVerifyLib();
         attestation = new AutomataDcapV3Attestation(
-            address(sigVerifyLib),
-            enclaveIdDaoAddr,
-            enclaveIdHelperAddr,
-            pckHelperAddr,
-            tcbDaoAddr,
-            tcbHelperAddr,
-            crlHelperAddr,
-            pcsDaoAddr
+            enclaveIdDaoAddr, enclaveIdHelperAddr, pckHelperAddr, tcbDaoAddr, tcbHelperAddr, crlHelperAddr, pcsDaoAddr
         );
         attestation.setMrEnclave(mrEnclave, true);
         attestation.setMrSigner(mrSigner, true);

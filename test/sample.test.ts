@@ -19,14 +19,8 @@ describe("AutomataDcapV3Attestation sample", () => {
         
         const ret = await setupPccs();
 
-        // Step 1: deploy SigVerifyLib
-        const sigVerifyLib = await ethers.deployContract('SigVerifyLib');
-        const sigVerifyLibAddr = await sigVerifyLib.getAddress();
-        console.log(`SigVerifyLibAddr deployed at: ${sigVerifyLibAddr}`);
-
-        // Step 2: deploy attestation contract
+        // Step 1: deploy attestation contract
         const attestationContract = await ethers.deployContract('AutomataDcapV3Attestation', [
-            sigVerifyLibAddr,
             ENCLAVE_IDENTITY_DAO_PORTAL,
             ret.enclaveIdHelperAddr,
             X509_HELPER,

@@ -3,13 +3,13 @@ pragma solidity ^0.8.0;
 
 import {IAttestation} from "../interfaces/IAttestation.sol";
 import {EnclaveIdBase, EnclaveIdTcbStatus} from "../base/EnclaveIdBase.sol";
-import {PEMCertChainBase, X509CertObj, PCKCertTCB} from "../base/PEMCertChainBase.sol";
+import {PEMCertChainBase, X509CertObj, PCKCertTCB, LibString, BytesUtils} from "../base/PEMCertChainBase.sol";
 import {TCBInfoBase, TcbInfoJsonObj, TCBStatus} from "../base/TCBInfoBase.sol";
 
-import {Base64, LibString} from "solady/Milady.sol";
-import {BytesUtils} from "../utils/BytesUtils.sol";
 import {V3Struct} from "./QuoteV3Auth/V3Struct.sol";
 import {V3Parser} from "./QuoteV3Auth/V3Parser.sol";
+
+import {P256} from "p256-verifier/P256.sol";
 
 contract AutomataDcapV3Attestation is IAttestation, EnclaveIdBase, PEMCertChainBase, TCBInfoBase {
     using BytesUtils for bytes;
@@ -25,7 +25,6 @@ contract AutomataDcapV3Attestation is IAttestation, EnclaveIdBase, PEMCertChainB
     address public owner;
 
     constructor(
-        address sigVerifyLibAddr,
         address enclaveIdDaoAddr,
         address enclaveIdHelperAddr,
         address pckHelperAddr,
@@ -35,7 +34,7 @@ contract AutomataDcapV3Attestation is IAttestation, EnclaveIdBase, PEMCertChainB
         address pcsDaoAddr
     )
         EnclaveIdBase(enclaveIdDaoAddr, enclaveIdHelperAddr)
-        PEMCertChainBase(sigVerifyLibAddr, pckHelperAddr, crlHelperAddr, pcsDaoAddr)
+        PEMCertChainBase(pckHelperAddr, crlHelperAddr, pcsDaoAddr)
         TCBInfoBase(tcbDaoAddr, tcbHelperAddr)
     {
         owner = msg.sender;
@@ -223,13 +222,26 @@ contract AutomataDcapV3Attestation is IAttestation, EnclaveIdBase, PEMCertChainB
         if (qeReportDataIsValid) {
             bytes memory pckSignedQeReportBytes = V3Parser.packQEReport(authDataV3.pckSignedQeReport);
             bool qeSigVerified =
-                sigVerifyLib.verifyES256Signature(pckSignedQeReportBytes, authDataV3.qeReportSignature, pckCertPubKey);
-            bool quoteSigVerified = sigVerifyLib.verifyES256Signature(
-                signedQuoteData, authDataV3.ecdsa256BitSignature, authDataV3.ecdsaAttestationKey
-            );
+                _ecdsaVerify(sha256(pckSignedQeReportBytes), authDataV3.qeReportSignature, pckCertPubKey);
+            bool quoteSigVerified =
+                _ecdsaVerify(sha256(signedQuoteData), authDataV3.ecdsa256BitSignature, authDataV3.ecdsaAttestationKey);
             return qeSigVerified && quoteSigVerified;
         } else {
             return false;
         }
+    }
+
+    function _ecdsaVerify(bytes32 message, bytes memory signature, bytes memory key)
+        private
+        view
+        returns (bool verified)
+    {
+        verified = P256.verifySignatureAllowMalleability(
+            message,
+            uint256(bytes32(signature.substring(0, 32))),
+            uint256(bytes32(signature.substring(32, 32))),
+            uint256(bytes32(key.substring(0, 32))),
+            uint256(bytes32(key.substring(32, 32)))
+        );
     }
 }

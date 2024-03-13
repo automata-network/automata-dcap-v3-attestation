@@ -1,13 +1,13 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 
-import {LibString} from "solady/Milady.sol";
+import {BytesUtils} from "../utils/BytesUtils.sol";
+
+import {LibString} from "solady/utils/LibString.sol";
 import {PCKHelper, X509CertObj} from "@automata-network/on-chain-pccs/helper/PCKHelper.sol";
 import {X509CRLHelper} from "@automata-network/on-chain-pccs/helper/X509CRLHelper.sol";
 import {PcsDao, CA} from "@automata-network/on-chain-pccs/dao/PcsDao.sol";
-
-// External Libraries
-import {ISigVerifyLib} from "../interfaces/ISigVerifyLib.sol";
+import {P256} from "p256-verifier/P256.sol";
 
 struct PCKCertTCB {
     uint16 pcesvn;
@@ -17,7 +17,8 @@ struct PCKCertTCB {
 }
 
 abstract contract PEMCertChainBase {
-    ISigVerifyLib public immutable sigVerifyLib;
+    using BytesUtils for bytes;
+
     PCKHelper public immutable pckHelper;
     X509CRLHelper public immutable crlHelper;
     PcsDao public immutable pcsDao;
@@ -29,8 +30,7 @@ abstract contract PEMCertChainBase {
     // the uncompressed (0x04) prefix is not included in the pubkey pre-image
     bytes32 constant ROOTCA_PUBKEY_HASH = 0x89f72d7c488e5b53a77c23ebcb36970ef7eb5bcf6658e9b8292cfbe4703a8473;
 
-    constructor(address _sigVerifyLib, address _pckHelper, address _crlHelper, address _pcsDao) {
-        sigVerifyLib = ISigVerifyLib(_sigVerifyLib);
+    constructor(address _pckHelper, address _crlHelper, address _pcsDao) {
         pckHelper = PCKHelper(_pckHelper);
         crlHelper = X509CRLHelper(_crlHelper);
         pcsDao = PcsDao(_pcsDao);
@@ -80,9 +80,17 @@ abstract contract PEMCertChainBase {
                 break;
             }
 
-            verified = sigVerifyLib.verifyES256Signature(certs[i].tbs, certs[i].signature, issuer.subjectPublicKey);
-            if (!verified) {
-                break;
+            {
+                verified = P256.verifySignatureAllowMalleability(
+                    sha256(certs[i].tbs),
+                    uint256(bytes32(certs[i].signature.substring(0, 32))),
+                    uint256(bytes32(certs[i].signature.substring(32, 32))),
+                    uint256(bytes32(issuer.subjectPublicKey.substring(0, 32))),
+                    uint256(bytes32(issuer.subjectPublicKey.substring(32, 32)))
+                );
+                if (!verified) {
+                    break;
+                }
             }
 
             bytes32 issuerPubKeyHash = keccak256(issuer.subjectPublicKey);
