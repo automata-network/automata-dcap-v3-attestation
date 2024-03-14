@@ -15,7 +15,8 @@ const config: HardhatUserConfig = {
         enabled: true,
         runs: Math.pow(2, 32) - 1
       },
-      viaIR: true
+      // NOTE: disable viaIR for linea for now, because it does not pass code verification
+      // viaIR: true
     }
   },
   networks: {
@@ -24,7 +25,7 @@ const config: HardhatUserConfig = {
         // provide a network url where the P256Verifier library exists
         // ref: https://github.com/daimo-eth/p256-verifier
         url: FORK_URL!,
-        blockNumber: 3881764 // pinned Feb 22nd, 2024, 1339h UTC+8
+        blockNumber: 4300087 // pinned March 14th, 2014, Happy Pi Day!
       },
       accounts: [{
         privateKey: PRIVATE_KEY!,

@@ -6,12 +6,9 @@ import "forge-std/StdJson.sol";
 import "solady/utils/JSONParserLib.sol";
 import "solady/utils/LibString.sol";
 
-import {
-    EnclaveIdentityHelper,
-    EnclaveIdentityJsonObj
-} from "@automata-network/on-chain-pccs/helper/EnclaveIdentityHelper.sol";
+import {EnclaveIdentityJsonObj} from "@automata-network/on-chain-pccs/helper/EnclaveIdentityHelper.sol";
 import {EnclaveIdentityDao} from "@automata-network/on-chain-pccs/dao/EnclaveIdentityDao.sol";
-import {FmspcTcbHelper, TcbInfoJsonObj} from "@automata-network/on-chain-pccs/helper/FmspcTcbHelper.sol";
+import {TcbInfoJsonObj} from "@automata-network/on-chain-pccs/helper/FmspcTcbHelper.sol";
 import {FmspcTcbDao} from "@automata-network/on-chain-pccs/dao/FmspcTcbDao.sol";
 import {PCKHelper} from "@automata-network/on-chain-pccs/helper/PCKHelper.sol";
 import {X509CRLHelper} from "@automata-network/on-chain-pccs/helper/X509CRLHelper.sol";
@@ -30,10 +27,8 @@ abstract contract PCCSSetup is Test {
     address internal tcbDaoAddr = vm.envAddress("FMSPC_TCB_DAO_PORTAL");
     address internal crlHelperAddr = vm.envAddress("X509_CRL_HELPER");
     address internal pcsDaoAddr = vm.envAddress("PCS_DAO_PORTAL");
-
-    // re-deploy these helpers because they are outdated
-    address internal tcbHelperAddr;
-    address internal enclaveIdHelperAddr;
+    address internal tcbHelperAddr = vm.envAddress("FMSPC_TCB_HELPER");
+    address internal enclaveIdHelperAddr = vm.envAddress("ENCLAVE_IDENTITY_HELPER");
 
     string internal constant tcbInfoPath = "/assets/0224/tcbInfo.json";
     string internal constant idPath = "/assets/0224/identity.json";
@@ -53,11 +48,6 @@ abstract contract PCCSSetup is Test {
         // comment this line out if you are replacing sampleQuote with your own
         // this line is needed to bypass expiry reverts for stale quotes
         vm.warp(1708508100);
-
-        FmspcTcbHelper fmspcTcbHelper = new FmspcTcbHelper();
-        tcbHelperAddr = address(fmspcTcbHelper);
-        EnclaveIdentityHelper enclaveIdHelper = new EnclaveIdentityHelper();
-        enclaveIdHelperAddr = address(enclaveIdHelper);
 
         // upsert root ca
         PcsDao pcsDao = PcsDao(pcsDaoAddr);
