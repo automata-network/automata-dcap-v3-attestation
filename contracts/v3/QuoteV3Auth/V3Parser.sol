@@ -154,8 +154,8 @@ library V3Parser {
         pure
         returns (bytes memory packedQEReport)
     {
-        uint16 isvProdIdPackBE = (enclaveReport.isvProdId >> 8) | (enclaveReport.isvProdId << 8);
-        uint16 isvSvnPackBE = (enclaveReport.isvSvn >> 8) | (enclaveReport.isvSvn << 8);
+        uint16 isvProdIdPackLE = (enclaveReport.isvProdId >> 8) | (enclaveReport.isvProdId << 8);
+        uint16 isvSvnPackLE = (enclaveReport.isvSvn >> 8) | (enclaveReport.isvSvn << 8);
         packedQEReport = abi.encodePacked(
             enclaveReport.cpuSvn,
             enclaveReport.miscSelect,
@@ -165,8 +165,8 @@ library V3Parser {
             enclaveReport.reserved2,
             enclaveReport.mrSigner,
             enclaveReport.reserved3,
-            isvProdIdPackBE,
-            isvSvnPackBE,
+            isvProdIdPackLE,
+            isvSvnPackLE,
             enclaveReport.reserved4,
             enclaveReport.reportData
         );
