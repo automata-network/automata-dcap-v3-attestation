@@ -51,7 +51,7 @@ contract AutomataDcapV3AttestationTest is PCCSSetup {
         returns (V3Struct.ParsedV3Quote memory v3quote)
     {
         bool success = false;
-        (success, v3quote,) = V3Parser.parseInput(v3QuoteBytes);
+        (success, v3quote,,) = V3Parser.parseInput(v3QuoteBytes);
         require(success, "V3Quote bytes parse failed");
     }
 }

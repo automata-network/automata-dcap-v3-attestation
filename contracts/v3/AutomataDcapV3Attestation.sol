@@ -63,7 +63,7 @@ contract AutomataDcapV3Attestation is IAttestation, EnclaveIdBase, PEMCertChainB
 
     /// --------------- validate parsed quote ---------------
     function verifyParsedQuote(V3Struct.ParsedV3Quote calldata v3quote) external returns (bool, uint256) {
-        return _verifyParsedQuote(v3quote, bytes(""));
+        return _verifyParsedQuote(v3quote, bytes(""), V3Parser.packQEReport(v3quote.v3AuthData.pckSignedQeReport));
     }
 
     /// @dev Provide the raw quote binary as input
@@ -86,21 +86,26 @@ contract AutomataDcapV3Attestation is IAttestation, EnclaveIdBase, PEMCertChainB
     /// @dev you can however, make a staticcall to this non-state changing method
     function _verify(bytes calldata quote) private returns (bool, uint256) {
         // Parse the quote input
-        (bool successful, V3Struct.ParsedV3Quote memory parsedV3Quote, bytes memory signedQuoteData) =
-            V3Parser.parseInput(quote);
+        (
+            bool successful,
+            V3Struct.ParsedV3Quote memory parsedV3Quote,
+            bytes memory signedQuoteData,
+            bytes memory rawQeReport
+        ) = V3Parser.parseInput(quote);
         if (!successful) {
             return (false, INVALID_EXIT_CODE);
         }
-        return _verifyParsedQuote(parsedV3Quote, signedQuoteData);
+        return _verifyParsedQuote(parsedV3Quote, signedQuoteData, rawQeReport);
     }
 
     /// @dev if the qupte is parsed on-chain, you must explicitly pass signedQuoteData here
     /// @dev view modifier omitted, because a PCCS cache miss emits an event
     /// @dev you can however, make a staticcall to this non-state changing method
-    function _verifyParsedQuote(V3Struct.ParsedV3Quote memory v3quote, bytes memory signedQuoteData)
-        private
-        returns (bool, uint256)
-    {
+    function _verifyParsedQuote(
+        V3Struct.ParsedV3Quote memory v3quote,
+        bytes memory signedQuoteData,
+        bytes memory rawQeReport
+    ) private returns (bool, uint256) {
         uint256 exitCode = INVALID_EXIT_CODE;
 
         // Step 0: Only validate the parsed quote if provided off-chain (gas-saving)
@@ -190,7 +195,7 @@ contract AutomataDcapV3Attestation is IAttestation, EnclaveIdBase, PEMCertChainB
         // Step 7: Verify the local attestation sig and qe report sig = 670k gas
         {
             bool enclaveReportSigsVerified = _enclaveReportSigVerification(
-                parsedCerts[0].subjectPublicKey, signedQuoteData, v3quote.v3AuthData, qeEnclaveReport
+                parsedCerts[0].subjectPublicKey, signedQuoteData, v3quote.v3AuthData, rawQeReport
             );
             if (!enclaveReportSigsVerified) {
                 return (false, exitCode);
@@ -211,18 +216,16 @@ contract AutomataDcapV3Attestation is IAttestation, EnclaveIdBase, PEMCertChainB
         bytes memory pckCertPubKey,
         bytes memory signedQuoteData,
         V3Struct.ECDSAQuoteV3AuthData memory authDataV3,
-        V3Struct.EnclaveReport memory qeEnclaveReport
+        bytes memory rawQeReport
     ) private view returns (bool) {
-        bytes32 expectedAuthDataHash = bytes32(qeEnclaveReport.reportData.substring(0, 32));
+        bytes32 expectedAuthDataHash = bytes32(authDataV3.pckSignedQeReport.reportData.substring(0, 32));
         bytes memory concatOfAttestKeyAndQeAuthData =
             abi.encodePacked(authDataV3.ecdsaAttestationKey, authDataV3.qeAuthData.data);
         bytes32 computedAuthDataHash = sha256(concatOfAttestKeyAndQeAuthData);
 
         bool qeReportDataIsValid = expectedAuthDataHash == computedAuthDataHash;
         if (qeReportDataIsValid) {
-            bytes memory pckSignedQeReportBytes = V3Parser.packQEReport(authDataV3.pckSignedQeReport);
-            bool qeSigVerified =
-                _ecdsaVerify(sha256(pckSignedQeReportBytes), authDataV3.qeReportSignature, pckCertPubKey);
+            bool qeSigVerified = _ecdsaVerify(sha256(rawQeReport), authDataV3.qeReportSignature, pckCertPubKey);
             bool quoteSigVerified =
                 _ecdsaVerify(sha256(signedQuoteData), authDataV3.ecdsa256BitSignature, authDataV3.ecdsaAttestationKey);
             return qeSigVerified && quoteSigVerified;

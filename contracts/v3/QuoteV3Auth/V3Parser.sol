@@ -33,27 +33,34 @@ library V3Parser {
     function parseInput(bytes memory quote)
         internal
         pure
-        returns (bool success, V3Struct.ParsedV3Quote memory v3ParsedQuote, bytes memory signedQuoteData)
+        returns (
+            bool success,
+            V3Struct.ParsedV3Quote memory v3ParsedQuote,
+            bytes memory signedQuoteData,
+            bytes memory rawQeReport
+        )
     {
         if (quote.length <= MINIMUM_QUOTE_LENGTH) {
-            return (false, v3ParsedQuote, signedQuoteData);
+            return (false, v3ParsedQuote, signedQuoteData, rawQeReport);
         }
 
         uint256 localAuthDataSize = littleEndianDecode(quote.substring(432, 4));
         if (quote.length - 436 != localAuthDataSize) {
-            return (false, v3ParsedQuote, signedQuoteData);
+            return (false, v3ParsedQuote, signedQuoteData, rawQeReport);
         }
 
         bytes memory rawHeader = quote.substring(0, 48);
         (bool headerVerifiedSuccessfully, V3Struct.Header memory header) = parseAndVerifyHeader(rawHeader);
         if (!headerVerifiedSuccessfully) {
-            return (false, v3ParsedQuote, signedQuoteData);
+            return (false, v3ParsedQuote, signedQuoteData, rawQeReport);
         }
 
-        (bool authDataVerifiedSuccessfully, V3Struct.ECDSAQuoteV3AuthData memory authDataV3) =
+        bool authDataVerifiedSuccessfully;
+        V3Struct.ECDSAQuoteV3AuthData memory authDataV3;
+        (authDataVerifiedSuccessfully, authDataV3, rawQeReport) =
             parseAuthDataAndVerifyCertType(quote.substring(436, localAuthDataSize));
         if (!authDataVerifiedSuccessfully) {
-            return (false, v3ParsedQuote, signedQuoteData);
+            return (false, v3ParsedQuote, signedQuoteData, rawQeReport);
         }
 
         bytes memory rawLocalEnclaveReport = quote.substring(48, 384);
@@ -240,7 +247,7 @@ library V3Parser {
     function parseAuthDataAndVerifyCertType(bytes memory rawAuthData)
         private
         pure
-        returns (bool success, V3Struct.ECDSAQuoteV3AuthData memory authDataV3)
+        returns (bool success, V3Struct.ECDSAQuoteV3AuthData memory authDataV3, bytes memory rawQeReport)
     {
         V3Struct.QEAuthData memory qeAuthData;
         qeAuthData.parsedDataSize = uint16(littleEndianDecode(rawAuthData.substring(576, 2)));
@@ -251,7 +258,7 @@ library V3Parser {
 
         cert.certType = uint16(littleEndianDecode(rawAuthData.substring(offset, 2)));
         if (cert.certType < 1 || cert.certType > 5) {
-            return (false, authDataV3);
+            return (false, authDataV3, rawQeReport);
         }
         offset += 2;
         cert.certDataSize = uint32(littleEndianDecode(rawAuthData.substring(offset, 4)));
@@ -260,11 +267,11 @@ library V3Parser {
         bool splitChainSuccessfully;
         (splitChainSuccessfully, cert.decodedCertDataArray) = splitCertificateChain(certData, 3);
         if (!splitChainSuccessfully) {
-            return (false, authDataV3);
+            return (false, authDataV3, rawQeReport);
         }
         authDataV3.ecdsa256BitSignature = rawAuthData.substring(0, 64);
         authDataV3.ecdsaAttestationKey = rawAuthData.substring(64, 64);
-        bytes memory rawQeReport = rawAuthData.substring(128, 384);
+        rawQeReport = rawAuthData.substring(128, 384);
         authDataV3.pckSignedQeReport = parseEnclaveReport(rawQeReport);
         authDataV3.qeReportSignature = rawAuthData.substring(512, 64);
         authDataV3.qeAuthData = qeAuthData;
