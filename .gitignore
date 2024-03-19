@@ -5,4 +5,9 @@ typechain-types/
 **/.DS_Store
 out/
 **/.env
-broadcast/
+
+# Ignores development broadcast logs
+broadcast/**/31337/
+broadcast/**/run-*.json
+broadcast/**/dry-run/
+!broadcast/**/*-latest.json

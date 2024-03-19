@@ -2,44 +2,65 @@
 pragma solidity ^0.8.0;
 
 import {BytesUtils} from "../../utils/BytesUtils.sol";
-import {Base64} from "solady/src/Milady.sol";
+import {LibString} from "solady/utils/LibString.sol";
+import {Base64} from "solady/utils/Base64.sol";
 import {V3Struct} from "./V3Struct.sol";
-import {IPEMCertChainLib, PEMCertChainLib} from "../../lib/PEMCertChainLib.sol";
 
 library V3Parser {
     using BytesUtils for bytes;
 
-    uint256 constant MINIMUM_QUOTE_LENGTH = 1020;
-    bytes2 constant SUPPORTED_QUOTE_VERSION = 0x0300;
-    bytes2 constant SUPPORTED_ATTESTATION_KEY_TYPE = 0x0200;
-    // SGX only
-    bytes4 constant SUPPORTED_TEE_TYPE = 0;
+    string constant HEADER = "-----BEGIN CERTIFICATE-----";
+    string constant FOOTER = "-----END CERTIFICATE-----";
+    uint256 constant HEADER_LENGTH = 27;
+    uint256 constant FOOTER_LENGTH = 25;
+
+    /// @dev relevant constants can be found at https://github.com/intel/SGX-TDX-DCAP-QuoteVerificationLibrary/blob/stable/Src/AttestationLibrary/src/QuoteVerification/QuoteConstants.h
+
+    uint256 constant MINIMUM_QUOTE_LENGTH = 1020; // https://github.com/intel/SGX-TDX-DCAP-QuoteVerificationLibrary/blob/16b7291a7a86e486fdfcf1dfb4be885c0cc00b4e/Src/AttestationLibrary/src/QuoteVerification/QuoteConstants.h#L95-L99
+    bytes2 constant SUPPORTED_QUOTE_VERSION = 0x0300; // v3
+    bytes2 constant SUPPORTED_ATTESTATION_KEY_TYPE = 0x0200; // ECDSA_256_WITH_P256_CURVE
+    bytes4 constant SUPPORTED_TEE_TYPE = 0; // SGX
     bytes16 constant VALID_QE_VENDOR_ID = 0x939a7233f79c4ca9940a0db3957f0607;
 
-    function parseInput(bytes memory quote, address pemCertLibAddr)
+    /**
+     * @param quote encoded in bytes array
+     * The specification of the encoded bytes is described as the following:
+     * [0:48] bytes: quote header, see {V3Struct.Header} for definition
+     * [48:432] bytes: local enclave report, see {V3Struct.EnclaveReport} for definition
+     * [432:436] bytes: quote auth data length (X)
+     * [432:432 + X] bytes: quote auth data, see {V3Struct.ECDSAQuoteV3AuthData} for definition
+     */
+    function parseInput(bytes memory quote)
         internal
         pure
-        returns (bool success, V3Struct.ParsedV3Quote memory v3ParsedQuote, bytes memory signedQuoteData)
+        returns (
+            bool success,
+            V3Struct.ParsedV3Quote memory v3ParsedQuote,
+            bytes memory signedQuoteData,
+            bytes memory rawQeReport
+        )
     {
         if (quote.length <= MINIMUM_QUOTE_LENGTH) {
-            return (false, v3ParsedQuote, signedQuoteData);
+            return (false, v3ParsedQuote, signedQuoteData, rawQeReport);
         }
 
         uint256 localAuthDataSize = littleEndianDecode(quote.substring(432, 4));
         if (quote.length - 436 != localAuthDataSize) {
-            return (false, v3ParsedQuote, signedQuoteData);
+            return (false, v3ParsedQuote, signedQuoteData, rawQeReport);
         }
 
         bytes memory rawHeader = quote.substring(0, 48);
         (bool headerVerifiedSuccessfully, V3Struct.Header memory header) = parseAndVerifyHeader(rawHeader);
         if (!headerVerifiedSuccessfully) {
-            return (false, v3ParsedQuote, signedQuoteData);
+            return (false, v3ParsedQuote, signedQuoteData, rawQeReport);
         }
 
-        (bool authDataVerifiedSuccessfully, V3Struct.ECDSAQuoteV3AuthData memory authDataV3) =
-            parseAuthDataAndVerifyCertType(quote.substring(436, localAuthDataSize), pemCertLibAddr);
+        bool authDataVerifiedSuccessfully;
+        V3Struct.ECDSAQuoteV3AuthData memory authDataV3;
+        (authDataVerifiedSuccessfully, authDataV3, rawQeReport) =
+            parseAuthDataAndVerifyCertType(quote.substring(436, localAuthDataSize));
         if (!authDataVerifiedSuccessfully) {
-            return (false, v3ParsedQuote, signedQuoteData);
+            return (false, v3ParsedQuote, signedQuoteData, rawQeReport);
         }
 
         bytes memory rawLocalEnclaveReport = quote.substring(48, 384);
@@ -140,8 +161,8 @@ library V3Parser {
         pure
         returns (bytes memory packedQEReport)
     {
-        uint16 isvProdIdPackBE = (enclaveReport.isvProdId >> 8) | (enclaveReport.isvProdId << 8);
-        uint16 isvSvnPackBE = (enclaveReport.isvSvn >> 8) | (enclaveReport.isvSvn << 8);
+        uint16 isvProdIdPackLE = (enclaveReport.isvProdId >> 8) | (enclaveReport.isvProdId << 8);
+        uint16 isvSvnPackLE = (enclaveReport.isvSvn >> 8) | (enclaveReport.isvSvn << 8);
         packedQEReport = abi.encodePacked(
             enclaveReport.cpuSvn,
             enclaveReport.miscSelect,
@@ -151,8 +172,8 @@ library V3Parser {
             enclaveReport.reserved2,
             enclaveReport.mrSigner,
             enclaveReport.reserved3,
-            isvProdIdPackBE,
-            isvSvnPackBE,
+            isvProdIdPackLE,
+            isvSvnPackLE,
             enclaveReport.reserved4,
             enclaveReport.reportData
         );
@@ -211,10 +232,22 @@ library V3Parser {
         success = true;
     }
 
-    function parseAuthDataAndVerifyCertType(bytes memory rawAuthData, address pemCertLibAddr)
+    /**
+     * @dev see {V3Struct.ECDSAQuoteV3AuthData} for an overview of the struct
+     * [0:64] bytes: ecdsa256BitSignature
+     * [64:128] bytes: ecdsaAttestationKey
+     * [128:512] bytes: qeReport
+     * [512:576] bytes: qeReportSignature
+     * [576:578] bytes: qeAuthDataSize (Y)
+     * [578:578+Y] bytes: qeAuthData
+     * [578+Y:580+Y] bytes: certType
+     * [580+Y:584+Y] bytes: certSize (Z)
+     * [584+Y:584+Y+Z] bytes: certData
+     */
+    function parseAuthDataAndVerifyCertType(bytes memory rawAuthData)
         private
         pure
-        returns (bool success, V3Struct.ECDSAQuoteV3AuthData memory authDataV3)
+        returns (bool success, V3Struct.ECDSAQuoteV3AuthData memory authDataV3, bytes memory rawQeReport)
     {
         V3Struct.QEAuthData memory qeAuthData;
         qeAuthData.parsedDataSize = uint16(littleEndianDecode(rawAuthData.substring(576, 2)));
@@ -222,19 +255,23 @@ library V3Parser {
 
         uint256 offset = 578 + qeAuthData.parsedDataSize;
         V3Struct.CertificationData memory cert;
+
         cert.certType = uint16(littleEndianDecode(rawAuthData.substring(offset, 2)));
         if (cert.certType < 1 || cert.certType > 5) {
-            return (false, authDataV3);
+            return (false, authDataV3, rawQeReport);
         }
         offset += 2;
         cert.certDataSize = uint32(littleEndianDecode(rawAuthData.substring(offset, 4)));
         offset += 4;
         bytes memory certData = rawAuthData.substring(offset, cert.certDataSize);
-        cert.decodedCertDataArray = parseCerificationChainBytes(certData, pemCertLibAddr);
-
+        bool splitChainSuccessfully;
+        (splitChainSuccessfully, cert.decodedCertDataArray) = splitCertificateChain(certData, 3);
+        if (!splitChainSuccessfully) {
+            return (false, authDataV3, rawQeReport);
+        }
         authDataV3.ecdsa256BitSignature = rawAuthData.substring(0, 64);
         authDataV3.ecdsaAttestationKey = rawAuthData.substring(64, 64);
-        bytes memory rawQeReport = rawAuthData.substring(128, 384);
+        rawQeReport = rawAuthData.substring(128, 384);
         authDataV3.pckSignedQeReport = parseEnclaveReport(rawQeReport);
         authDataV3.qeReportSignature = rawAuthData.substring(512, 64);
         authDataV3.qeAuthData = qeAuthData;
@@ -243,20 +280,71 @@ library V3Parser {
         success = true;
     }
 
-    function parseCerificationChainBytes(bytes memory certBytes, address pemCertLibAddr)
+    function splitCertificateChain(bytes memory pemChain, uint256 size)
         private
         pure
-        returns (bytes[3] memory certChainData)
+        returns (bool success, bytes[] memory certs)
     {
-        IPEMCertChainLib pemCertLib = PEMCertChainLib(pemCertLibAddr);
-        IPEMCertChainLib.ECSha256Certificate[] memory parsedQuoteCerts;
-        (bool certParsedSuccessfully, bytes[] memory quoteCerts) = pemCertLib.splitCertificateChain(certBytes, 3);
-        require(certParsedSuccessfully, "splitCertificateChain failed");
-        parsedQuoteCerts = new IPEMCertChainLib.ECSha256Certificate[](3);
-        for (uint256 i = 0; i < 3; i++) {
-            quoteCerts[i] = Base64.decode(string(quoteCerts[i]));
+        certs = new bytes[](size);
+        string memory pemChainStr = string(pemChain);
+
+        uint256 index = 0;
+        uint256 len = pemChain.length;
+
+        for (uint256 i = 0; i < size; i++) {
+            string memory input;
+            if (i > 0) {
+                input = LibString.slice(pemChainStr, index, index + len);
+            } else {
+                input = pemChainStr;
+            }
+            uint256 increment;
+            (success, certs[i], increment) = removeHeadersAndFooters(input);
+            certs[i] = Base64.decode(string(certs[i]));
+
+            if (!success) {
+                return (false, certs);
+            }
+
+            index += increment;
         }
 
-        certChainData = [quoteCerts[0], quoteCerts[1], quoteCerts[2]];
+        success = true;
+    }
+
+    function removeHeadersAndFooters(string memory pemData)
+        private
+        pure
+        returns (bool success, bytes memory extracted, uint256 endIndex)
+    {
+        // Check if the input contains the "BEGIN" and "END" headers
+        uint256 beginPos = LibString.indexOf(pemData, HEADER);
+        uint256 endPos = LibString.indexOf(pemData, FOOTER);
+
+        bool headerFound = beginPos != LibString.NOT_FOUND;
+        bool footerFound = endPos != LibString.NOT_FOUND;
+
+        if (!headerFound || !footerFound) {
+            return (false, extracted, endIndex);
+        }
+
+        // Extract the content between the headers
+        uint256 contentStart = beginPos + HEADER_LENGTH;
+
+        // Extract and return the content
+        bytes memory contentBytes;
+
+        // do not include newline
+        bytes memory delimiter = hex"0a";
+        string memory contentSlice = LibString.slice(pemData, contentStart, endPos);
+        string[] memory split = LibString.split(contentSlice, string(delimiter));
+        string memory contentStr;
+
+        for (uint256 i = 0; i < split.length; i++) {
+            contentStr = LibString.concat(contentStr, split[i]);
+        }
+
+        contentBytes = bytes(contentStr);
+        return (true, contentBytes, endPos + FOOTER_LENGTH);
     }
 }
