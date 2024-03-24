@@ -122,7 +122,7 @@ contract PEMCertChainLib is IPEMCertChainLib {
             uint256 notAfterPtr = der.nextSiblingOf(notBeforePtr);
             bytes1 notBeforeTag = der[notBeforePtr.ixs()];
             bytes1 notAfterTag = der[notAfterPtr.ixs()];
-            if ((notBeforeTag != 0x17 && notBeforeTag == 0x18) || (notAfterTag != 0x17 && notAfterTag != 0x18)) {
+            if ((notBeforeTag != 0x17 && notBeforeTag != 0x18) || (notAfterTag != 0x17 && notAfterTag != 0x18)) {
                 return (false, cert);
             }
             cert.notBefore = X509DateUtils.toTimestamp(der.bytesAt(notBeforePtr));
