@@ -106,9 +106,9 @@ contract AutomataDcapV3Attestation is IAttestation {
             || status == TCBInfoStruct.TCBStatus.TCB_CONFIGURATION_AND_SW_HARDENING_NEEDED;
     }
 
-    function verifyAttestation(bytes calldata data) external view override returns (bool) {
-        (bool success,) = _verify(data);
-        return success;
+    function verifyAttestation(bytes calldata data) external view override returns (bool, bytes memory) {
+        (bool success, , bytes memory reportData) = _verify(data);
+        return (success, reportData);
     }
 
     /// --------------- validate parsed quote ---------------
@@ -131,15 +131,18 @@ contract AutomataDcapV3Attestation is IAttestation {
     /// @dev For all valid quote verification, returns the following data:
     /// (_attestationTcbIsValid(), abi.encodePacked(sha256(quote), uint8 exitCode))
     /// @dev exitCode is defined in the {{ TCBInfoStruct.TCBStatus }} enum
-    function _verify(bytes calldata quote) private view returns (bool, bytes memory) {
+    function _verify(bytes calldata quote) private view returns (bool, bytes memory, bytes memory) {
         // Step 1: Parse the quote input = 152k gas
         (bool successful, V3Struct.ParsedV3Quote memory parsedV3Quote, bytes memory signedQuoteData) =
             V3Parser.parseInput(quote, address(pemCertLib));
         if (!successful) {
-            return (false, abi.encodePacked(INVALID_EXIT_CODE));
+            bytes memory reportData = new bytes(64);
+            return (false, abi.encodePacked(INVALID_EXIT_CODE), reportData);
         }
 
-        return _verifyParsedQuote(parsedV3Quote, signedQuoteData);
+        bytes memory retData;
+        (successful, retData) = _verifyParsedQuote(parsedV3Quote, signedQuoteData);
+        return (successful, retData, parsedV3Quote.localEnclaveReport.reportData);
     }
 
     /// @dev if the qupte is parsed on-chain, you must explicitly pass signedQuoteData here

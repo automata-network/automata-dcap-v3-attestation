@@ -64,7 +64,7 @@ contract AutomataDcapV3AttestationTest is Test, DcapTestUtils {
 
     function testAttestation() public {
         vm.prank(user);
-        bool verified = attestation.verifyAttestation(sampleQuote);
+        (bool verified,) = attestation.verifyAttestation(sampleQuote);
         assertTrue(verified);
     }
 
@@ -82,7 +82,7 @@ contract AutomataDcapV3AttestationTest is Test, DcapTestUtils {
         attestation.addRevokedCertSerialNum(uint256(0), serial);
 
         vm.prank(user);
-        bool verified = attestation.verifyAttestation(sampleQuote);
+        (bool verified,) = attestation.verifyAttestation(sampleQuote);
         assertTrue(!verified);
     }
 
