@@ -6,13 +6,15 @@ import {
     X509_HELPER,
     FMSPC_TCB_DAO_PORTAL,
     X509_CRL_HELPER,
-    PCS_DAO_PORTAL
+    PCS_DAO_PORTAL,
+    RISC0_DCAP_VERIFIER
 } from './utils/pccs';
 import { AutomataDcapV3Attestation } from '../typechain-types';
 
 describe("AutomataDcapV3Attestation sample", () => {
     let attestationAddr: string = '';
-    
+    let imageId: string = '';
+
     before(async() => {
         // Step 0: check pinned timestamp from config
         // if you supply your own collaterals, you might need to change them
@@ -27,7 +29,9 @@ describe("AutomataDcapV3Attestation sample", () => {
             FMSPC_TCB_DAO_PORTAL,
             ret.fmspcTcbHelperAddr,
             X509_CRL_HELPER,
-            PCS_DAO_PORTAL
+            PCS_DAO_PORTAL,
+            RISC0_DCAP_VERIFIER,
+            imageId
         ]);
         attestationAddr = await attestationContract.getAddress();
         console.log(`AutomataDcapV3Attestation deployed at: ${attestationAddr}`)

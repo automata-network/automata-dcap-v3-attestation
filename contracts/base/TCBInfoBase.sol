@@ -7,6 +7,7 @@ import {
     TCBLevelsObj,
     TCBStatus
 } from "@automata-network/on-chain-pccs/helper/FmspcTcbHelper.sol";
+import {EnclaveIdTcbStatus} from "@automata-network/on-chain-pccs/helper/EnclaveIdentityHelper.sol";
 import {FmspcTcbDao} from "@automata-network/on-chain-pccs/dao/FmspcTcbDao.sol";
 
 import {PCKCertTCB} from "./PEMCertChainBase.sol";
@@ -29,7 +30,7 @@ abstract contract TCBInfoBase {
         success = bytes(tcbObj.tcbInfoStr).length > 0 && tcbObj.signature.length > 0;
     }
 
-    function _checkTcbLevels(PCKCertTCB memory pckTcb, TcbInfoJsonObj memory tcbJson)
+    function _checkTcbLevels(EnclaveIdTcbStatus qeTcbStatus, PCKCertTCB memory pckTcb, TcbInfoJsonObj memory tcbJson)
         internal
         view
         returns (bool, TCBStatus status)
@@ -43,8 +44,22 @@ abstract contract TCBInfoBase {
             bool pceSvnIsHigherOrGreater = pckTcb.pcesvn >= current.pcesvn;
             bool cpuSvnsAreHigherOrGreater = _isCpuSvnHigherOrGreater(pckTcb.cpusvns, current.cpusvnsArr);
             if (pceSvnIsHigherOrGreater && cpuSvnsAreHigherOrGreater) {
-                status = current.status;
-                bool tcbIsRevoked = status == TCBStatus.TCB_REVOKED;
+                bool tcbIsRevoked = status == TCBStatus.TCB_REVOKED
+                    || qeTcbStatus == EnclaveIdTcbStatus.SGX_ENCLAVE_REPORT_ISVSVN_REVOKED;
+                // https://github.com/intel/SGX-TDX-DCAP-QuoteVerificationLibrary/blob/16b7291a7a86e486fdfcf1dfb4be885c0cc00b4e/Src/AttestationLibrary/src/Verifiers/QuoteVerifier.cpp#L271-L312
+                if (qeTcbStatus == EnclaveIdTcbStatus.SGX_ENCLAVE_REPORT_ISVSVN_OUT_OF_DATE) {
+                    if (current.status == TCBStatus.OK || current.status == TCBStatus.TCB_SW_HARDENING_NEEDED) {
+                        status = TCBStatus.TCB_OUT_OF_DATE;
+                    }
+                    if (
+                        current.status == TCBStatus.TCB_CONFIGURATION_NEEDED
+                            || current.status == TCBStatus.TCB_CONFIGURATION_AND_SW_HARDENING_NEEDED
+                    ) {
+                        status = TCBStatus.TCB_OUT_OF_DATE_CONFIGURATION_NEEDED;
+                    }
+                } else {
+                    status = current.status;
+                }
                 return (!tcbIsRevoked, status);
             }
         }

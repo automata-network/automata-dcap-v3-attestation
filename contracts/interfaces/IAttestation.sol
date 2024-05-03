@@ -21,12 +21,12 @@ interface IAttestation {
     function verifyAndAttestOnChain(bytes calldata input) external returns (bytes memory output);
 
     /**
-     * @notice inputs/outputs of this method is identical as { verifyAttestationOnChain }
+     * @param journal -
      * @param postStateDigest - A hash of the final memory state. Required to run the verifier, but
      *     otherwise can be left unconstrained for most use cases.
      * @param seal - The encoded cryptographic proof (i.e. SNARK).
      */
-    function verifyAndAttestWithZKProof(bytes calldata input, bytes32 postStateDigest, bytes calldata seal)
+    function verifyAndAttestWithZKProof(bytes calldata journal, bytes32 postStateDigest, bytes calldata seal)
         external
         returns (bytes memory output);
 }

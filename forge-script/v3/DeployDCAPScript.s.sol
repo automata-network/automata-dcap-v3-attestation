@@ -15,10 +15,21 @@ contract DeployDCAPScript is Script {
         address tcbHelperAddr = vm.envAddress("FMSPC_TCB_HELPER");
         address crlHelperAddr = vm.envAddress("X509_CRL_HELPER");
         address pcsDaoAddr = vm.envAddress("PCS_DAO_PORTAL");
+        address risc0Verifier = vm.envAddress("RISC0_DCAP_VERIFIER");
         vm.broadcast(deployerKey);
 
+        bytes32 imageId;
+
         AutomataDcapV3Attestation attestation = new AutomataDcapV3Attestation(
-            enclaveIdDaoAddr, enclaveIdHelperAddr, pckHelperAddr, tcbDaoAddr, tcbHelperAddr, crlHelperAddr, pcsDaoAddr
+            enclaveIdDaoAddr,
+            enclaveIdHelperAddr,
+            pckHelperAddr,
+            tcbDaoAddr,
+            tcbHelperAddr,
+            crlHelperAddr,
+            pcsDaoAddr,
+            risc0Verifier,
+            imageId
         );
 
         console.log("[LOG] AutomataDcapV3Attestation deployed to %s", address(attestation));

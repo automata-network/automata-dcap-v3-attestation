@@ -9,7 +9,10 @@ fs_permissions = [{ access = "read", path = "./"}]
 remappings = [
     "solady/=lib/automata-on-chain-pccs/lib/solady/src/",
     "p256-verifier/=lib/automata-on-chain-pccs/lib/p256-verifier/src/",
-    "@automata-network/on-chain-pccs/=lib/automata-on-chain-pccs/src/"
+    "@automata-network/on-chain-pccs/=lib/automata-on-chain-pccs/src/",
+    "risc0/=lib/risc0-ethereum/contracts/src/",
+    # foundry is not able to detect this particular remapping for some reason...
+    "openzeppelin/=lib/risc0-ethereum/lib/openzeppelin-contracts/"
 ]
 solc = "0.8.21"
 optimizer = true

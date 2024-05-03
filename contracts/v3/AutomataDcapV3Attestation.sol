@@ -10,10 +10,17 @@ import {V3Struct} from "./QuoteV3Auth/V3Struct.sol";
 import {V3Parser} from "./QuoteV3Auth/V3Parser.sol";
 
 import {P256} from "p256-verifier/P256.sol";
+import {IRiscZeroVerifier} from "risc0/IRiscZeroVerifier.sol";
 
 contract AutomataDcapV3Attestation is IAttestation, EnclaveIdBase, PEMCertChainBase, TCBInfoBase {
     using BytesUtils for bytes;
     using LibString for bytes;
+
+    /// @notice RISC Zero verifier contract address.
+    IRiscZeroVerifier public immutable verifier;
+
+    /// @notice The ImageID of the Risc0 DCAP Guest ELF
+    bytes32 public immutable DCAP_RISC0_IMAGE_ID;
 
     constructor(
         address enclaveIdDaoAddr,
@@ -22,14 +29,20 @@ contract AutomataDcapV3Attestation is IAttestation, EnclaveIdBase, PEMCertChainB
         address tcbDaoAddr,
         address tcbHelperAddr,
         address crlHelperAddr,
-        address pcsDaoAddr
+        address pcsDaoAddr,
+        address risc0Verifier,
+        bytes32 imageId
     )
         EnclaveIdBase(enclaveIdDaoAddr, enclaveIdHelperAddr)
         PEMCertChainBase(pckHelperAddr, crlHelperAddr, pcsDaoAddr)
         TCBInfoBase(tcbDaoAddr, tcbHelperAddr)
-    {}
+    {
+        verifier = IRiscZeroVerifier(risc0Verifier);
+        DCAP_RISC0_IMAGE_ID = imageId;
+    }
 
     error Failed_To_Verify_Quote();
+    error Invalid_Collateral_Hashes();
 
     function verifyAndAttestOnChain(bytes calldata input) external override returns (bytes memory output) {
         bool verified;
@@ -39,12 +52,27 @@ contract AutomataDcapV3Attestation is IAttestation, EnclaveIdBase, PEMCertChainB
         }
     }
 
-    function verifyAndAttestWithZKProof(bytes calldata input, bytes32 postStateDigest, bytes calldata seal)
+    function verifyAndAttestWithZKProof(bytes calldata journal, bytes32 postStateDigest, bytes calldata seal)
         external
+        view
         override
         returns (bytes memory output)
     {
-        // TODO
+        bool verified = verifier.verify(seal, DCAP_RISC0_IMAGE_ID, postStateDigest, sha256(journal));
+
+        if (!verified) {
+            revert Failed_To_Verify_Quote();
+        }
+        
+        (bytes32 tcbSigningCertHash, bytes32 rootCaHash) =
+            _getCollateralHashesFromJournal(journal);
+
+        bool verifyHashes = _checkCollateralHashes(tcbSigningCertHash, rootCaHash);
+        if (!verifyHashes) {
+            revert Invalid_Collateral_Hashes();
+        }
+
+        output = journal[0:129];
     }
 
     /**
@@ -96,8 +124,8 @@ contract AutomataDcapV3Attestation is IAttestation, EnclaveIdBase, PEMCertChainB
 
         // Step 2: Verify enclave identity
         V3Struct.EnclaveReport memory qeEnclaveReport;
+        EnclaveIdTcbStatus qeTcbStatus;
         {
-            EnclaveIdTcbStatus qeTcbStatus;
             qeEnclaveReport = v3quote.v3AuthData.pckSignedQeReport;
             bool verifiedEnclaveIdSuccessfully;
             (verifiedEnclaveIdSuccessfully, qeTcbStatus) = _verifyQEReportWithIdentity(
@@ -144,7 +172,7 @@ contract AutomataDcapV3Attestation is IAttestation, EnclaveIdBase, PEMCertChainB
         {
             // 4k gas
             bool tcbVerified;
-            (tcbVerified, tcbStatus) = _checkTcbLevels(pckTcb, tcbInfoJson);
+            (tcbVerified, tcbStatus) = _checkTcbLevels(qeTcbStatus, pckTcb, tcbInfoJson);
             if (!tcbVerified) {
                 return (false, output);
             }
@@ -224,5 +252,26 @@ contract AutomataDcapV3Attestation is IAttestation, EnclaveIdBase, PEMCertChainB
     ) private pure returns (bytes memory serialized) {
         require(isvReportData.length < 65, "invalid enclave report data length");
         serialized = abi.encodePacked(tcbStatus, isvMrEnclave, isvMrSigner, isvReportData);
+    }
+
+    function _getCollateralHashesFromJournal(bytes calldata journal)
+        private
+        pure
+        returns (
+            bytes32 tcbSigningCertHash,
+            bytes32 rootCaHash
+        )
+    {
+        tcbSigningCertHash = bytes32(journal[199:231]);
+        rootCaHash = bytes32(journal[231:263]);
+    }
+
+    function _checkCollateralHashes(
+        bytes32 tcbSigningCertHash,
+        bytes32 rootCaHash
+    ) private pure returns (bool success) {
+        bool tcbSigningMatched = tcbSigningCertHash == 0xdf3061c165c0191e2658256a2855cac9267f179aafb1990c9e918d6452816adf;
+        bool rootCaMatched = rootCaHash == 0x0fa74a3f32c80b978c8ad671395dabf24283eef9091bc3919fd39b9915a87f1a;
+        success = tcbSigningMatched && rootCaMatched;
     }
 }
