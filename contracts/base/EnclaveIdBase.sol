@@ -27,13 +27,12 @@ abstract contract EnclaveIdBase {
         bytes32 enclaveReportMrsigner,
         uint16 enclaveReportIsvprodid,
         uint16 enclaveReportIsvSvn
-    ) internal returns (bool, EnclaveIdTcbStatus status) {
-        EnclaveIdentityJsonObj memory idJsonObj = enclaveIdDao.getEnclaveIdentity(0, 3);
+    ) internal view returns (bool, EnclaveIdTcbStatus status) {
+        bytes32 key = keccak256(abi.encodePacked(uint256(0), uint256(3)));
+        bytes32 attestationId = enclaveIdDao.enclaveIdentityAttestations(key);
+        bytes memory data = enclaveIdDao.getAttestedData(attestationId);
 
-        // TODO: it is prohibitively expensive to *repeateddly* parse collaterals on every call
-        // TODO: we might have to separately store these parsed collaterals on chain as well
-        IdentityObj memory identity = enclaveIdHelper.parseIdentityString(idJsonObj.identityStr);
-        Tcb[] memory identityTcbs = enclaveIdHelper.parseTcb(identity.rawTcbLevelsObjStr);
+        (IdentityObj memory identity,,,) = abi.decode(data, (IdentityObj, bytes32, string, bytes));
 
         bool miscselectMatched = enclaveReportMiscselect & identity.miscselectMask == identity.miscselect;
         bool attributesMatched = enclaveReportAttributes & identity.attributesMask == identity.attributes;
@@ -41,10 +40,10 @@ abstract contract EnclaveIdBase {
         bool isvprodidMatched = enclaveReportIsvprodid == identity.isvprodid;
 
         bool tcbFound;
-        for (uint256 i = 0; i < identityTcbs.length; i++) {
-            if (identityTcbs[i].isvsvn <= enclaveReportIsvSvn) {
+        for (uint256 i = 0; i < identity.tcb.length; i++) {
+            if (identity.tcb[i].isvsvn <= enclaveReportIsvSvn) {
                 tcbFound = true;
-                status = identityTcbs[i].status;
+                status = identity.tcb[i].status;
                 break;
             }
         }

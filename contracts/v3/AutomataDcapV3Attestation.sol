@@ -3,8 +3,8 @@ pragma solidity ^0.8.0;
 
 import {IAttestation} from "../interfaces/IAttestation.sol";
 import {EnclaveIdBase, EnclaveIdTcbStatus} from "../base/EnclaveIdBase.sol";
-import {PEMCertChainBase, X509CertObj, PCKCertTCB, LibString, BytesUtils} from "../base/PEMCertChainBase.sol";
-import {TCBInfoBase, TcbInfoJsonObj, TCBStatus} from "../base/TCBInfoBase.sol";
+import {PEMCertChainBase, X509CertObj, PCKCertTCB, LibString, BytesUtils, CA} from "../base/PEMCertChainBase.sol";
+import {TCBInfoBase, TCBLevelsObj, TCBStatus} from "../base/TCBInfoBase.sol";
 
 import {V3Struct} from "./QuoteV3Auth/V3Struct.sol";
 import {V3Parser} from "./QuoteV3Auth/V3Parser.sol";
@@ -44,7 +44,7 @@ contract AutomataDcapV3Attestation is IAttestation, EnclaveIdBase, PEMCertChainB
     error Failed_To_Verify_Quote();
     error Invalid_Collateral_Hashes();
 
-    function verifyAndAttestOnChain(bytes calldata input) external override returns (bytes memory output) {
+    function verifyAndAttestOnChain(bytes calldata input) external view override returns (bytes memory output) {
         bool verified;
         (verified, output) = _verify(input);
         if (!verified) {
@@ -63,9 +63,8 @@ contract AutomataDcapV3Attestation is IAttestation, EnclaveIdBase, PEMCertChainB
         if (!verified) {
             revert Failed_To_Verify_Quote();
         }
-        
-        (bytes32 tcbSigningCertHash, bytes32 rootCaHash) =
-            _getCollateralHashesFromJournal(journal);
+
+        (bytes32 tcbSigningCertHash, bytes32 rootCaHash) = _getCollateralHashesFromJournal(journal);
 
         bool verifyHashes = _checkCollateralHashes(tcbSigningCertHash, rootCaHash);
         if (!verifyHashes) {
@@ -80,6 +79,7 @@ contract AutomataDcapV3Attestation is IAttestation, EnclaveIdBase, PEMCertChainB
      */
     function verifyParsedQuoteAndAttestOnChain(V3Struct.ParsedV3Quote calldata v3quote)
         external
+        view
         returns (bytes memory output)
     {
         bool verified;
@@ -95,7 +95,7 @@ contract AutomataDcapV3Attestation is IAttestation, EnclaveIdBase, PEMCertChainB
     /// @dev you can however, make a staticcall to this non-state changing method
     /// @return verified output: serialized as bytes of the following values:
     ///     uint8 tcbStatus ++ bytes32 isvMrEnclave ++ bytes32 isvMrSigner ++ bytes64 isvReportData
-    function _verify(bytes calldata quote) private returns (bool verified, bytes memory output) {
+    function _verify(bytes calldata quote) private view returns (bool verified, bytes memory output) {
         // Parse the quote input
         (
             bool successful,
@@ -116,7 +116,7 @@ contract AutomataDcapV3Attestation is IAttestation, EnclaveIdBase, PEMCertChainB
         V3Struct.ParsedV3Quote memory v3quote,
         bytes memory signedQuoteData,
         bytes memory rawQeReport
-    ) private returns (bool verified, bytes memory output) {
+    ) private view returns (bool verified, bytes memory output) {
         // Step 1: Only validate the parsed quote if provided off-chain (gas-saving)
         if (signedQuoteData.length == 0) {
             signedQuoteData = V3Parser.validateParsedInput(v3quote);
@@ -161,10 +161,10 @@ contract AutomataDcapV3Attestation is IAttestation, EnclaveIdBase, PEMCertChainB
         }
 
         // Step 4: basic PCK and TCB check
-        TcbInfoJsonObj memory tcbInfoJson;
+        TCBLevelsObj[] memory tcbLevels;
         {
             bool tcbInfoFound;
-            (tcbInfoFound, tcbInfoJson) = _getTcbInfo(pckTcb.fmspcBytes.toHexStringNoPrefix());
+            (tcbInfoFound, tcbLevels) = _getTcbInfo(pckTcb.fmspcBytes.toHexStringNoPrefix());
         }
 
         // Step 5: Verify TCB Level
@@ -172,7 +172,7 @@ contract AutomataDcapV3Attestation is IAttestation, EnclaveIdBase, PEMCertChainB
         {
             // 4k gas
             bool tcbVerified;
-            (tcbVerified, tcbStatus) = _checkTcbLevels(qeTcbStatus, pckTcb, tcbInfoJson);
+            (tcbVerified, tcbStatus) = _checkTcbLevels(qeTcbStatus, pckTcb, tcbLevels);
             if (!tcbVerified) {
                 return (false, output);
             }
@@ -257,21 +257,20 @@ contract AutomataDcapV3Attestation is IAttestation, EnclaveIdBase, PEMCertChainB
     function _getCollateralHashesFromJournal(bytes calldata journal)
         private
         pure
-        returns (
-            bytes32 tcbSigningCertHash,
-            bytes32 rootCaHash
-        )
+        returns (bytes32 tcbSigningCertHash, bytes32 rootCaHash)
     {
         tcbSigningCertHash = bytes32(journal[199:231]);
         rootCaHash = bytes32(journal[231:263]);
     }
 
-    function _checkCollateralHashes(
-        bytes32 tcbSigningCertHash,
-        bytes32 rootCaHash
-    ) private pure returns (bool success) {
-        bool tcbSigningMatched = tcbSigningCertHash == 0xdf3061c165c0191e2658256a2855cac9267f179aafb1990c9e918d6452816adf;
-        bool rootCaMatched = rootCaHash == 0x0fa74a3f32c80b978c8ad671395dabf24283eef9091bc3919fd39b9915a87f1a;
-        success = tcbSigningMatched && rootCaMatched;
+    function _checkCollateralHashes(bytes32 tcbSigningCertHash, bytes32 rootCaHash)
+        private
+        view
+        returns (bool success)
+    {
+        (bool tcbSigningFound, bytes32 expectedTcbSigningHash) = _getCertHash(CA.SIGNING);
+        (bool rootCaFound, bytes32 expectedRootCaHash) = _getCertHash(CA.ROOT);
+        success = tcbSigningFound && rootCaFound && expectedTcbSigningHash == tcbSigningCertHash
+            && expectedRootCaHash == rootCaHash;
     }
 }

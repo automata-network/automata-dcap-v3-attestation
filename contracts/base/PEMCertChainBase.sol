@@ -102,4 +102,13 @@ abstract contract PEMCertChainBase {
         }
         return !certRevoked && certNotExpired && verified && certChainCanBeTrusted;
     }
+
+    function _getCertHash(CA ca) internal view returns (bool success, bytes32 certHash) {
+        bytes32 attestationId = pcsDao.pcsCertAttestations(ca);
+        success = attestationId != bytes32(0);
+        if (success) {
+            bytes memory data = pcsDao.getAttestedData(attestationId);
+            (certHash,) = abi.decode(data, (bytes32, bytes));
+        }
+    }
 }

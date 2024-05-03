@@ -1,12 +1,7 @@
 //SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 
-import {
-    FmspcTcbHelper,
-    TcbInfoJsonObj,
-    TCBLevelsObj,
-    TCBStatus
-} from "@automata-network/on-chain-pccs/helper/FmspcTcbHelper.sol";
+import {FmspcTcbHelper, TCBLevelsObj, TCBStatus} from "@automata-network/on-chain-pccs/helper/FmspcTcbHelper.sol";
 import {EnclaveIdTcbStatus} from "@automata-network/on-chain-pccs/helper/EnclaveIdentityHelper.sol";
 import {FmspcTcbDao} from "@automata-network/on-chain-pccs/dao/FmspcTcbDao.sol";
 
@@ -24,21 +19,22 @@ abstract contract TCBInfoBase {
         tcbHelper = FmspcTcbHelper(_tcbHelper);
     }
 
-    function _getTcbInfo(string memory fmspc) internal returns (bool success, TcbInfoJsonObj memory tcbObj) {
-        // v3 SGX Quote uses V2 TCBInfo
-        tcbObj = tcbDao.getTcbInfo(0, fmspc, 2);
-        success = bytes(tcbObj.tcbInfoStr).length > 0 && tcbObj.signature.length > 0;
+    function _getTcbInfo(string memory fmspc) internal view returns (bool success, TCBLevelsObj[] memory tcbLevels) {
+        bytes32 key = keccak256(abi.encodePacked(uint256(0), fmspc, uint256(2)));
+        bytes32 attestationId = tcbDao.fmspcTcbInfoAttestations(key);
+        success = attestationId != bytes32(0);
+        if (success) {
+            bytes memory data = tcbDao.getAttestedData(attestationId);
+            (,,,, tcbLevels,,,) =
+                abi.decode(data, (uint256, uint256, uint256, uint256, TCBLevelsObj[], bytes32, string, bytes));
+        }
     }
 
-    function _checkTcbLevels(EnclaveIdTcbStatus qeTcbStatus, PCKCertTCB memory pckTcb, TcbInfoJsonObj memory tcbJson)
+    function _checkTcbLevels(EnclaveIdTcbStatus qeTcbStatus, PCKCertTCB memory pckTcb, TCBLevelsObj[] memory tcbLevels)
         internal
-        view
+        pure
         returns (bool, TCBStatus status)
     {
-        // TODO: it is prohibitively expensive to *repeateddly* parse collaterals on every call
-        // TODO: we might have to separately store these parsed collaterals on chain as well
-        (, TCBLevelsObj[] memory tcbLevels) = tcbHelper.parseTcbLevels(tcbJson.tcbInfoStr);
-
         for (uint256 i = 0; i < tcbLevels.length; i++) {
             TCBLevelsObj memory current = tcbLevels[i];
             bool pceSvnIsHigherOrGreater = pckTcb.pcesvn >= current.pcesvn;
