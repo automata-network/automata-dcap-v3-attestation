@@ -11,16 +11,17 @@ import {V3Parser} from "./QuoteV3Auth/V3Parser.sol";
 
 import {P256} from "p256-verifier/P256.sol";
 import {IRiscZeroVerifier} from "risc0/IRiscZeroVerifier.sol";
+import {Ownable} from "solady/auth/Ownable.sol";
 
-contract AutomataDcapV3Attestation is IAttestation, EnclaveIdBase, PEMCertChainBase, TCBInfoBase {
+contract AutomataDcapV3Attestation is IAttestation, EnclaveIdBase, PEMCertChainBase, TCBInfoBase, Ownable {
     using BytesUtils for bytes;
     using LibString for bytes;
 
     /// @notice RISC Zero verifier contract address.
-    IRiscZeroVerifier public immutable verifier;
+    IRiscZeroVerifier public verifier;
 
     /// @notice The ImageID of the Risc0 DCAP Guest ELF
-    bytes32 public immutable DCAP_RISC0_IMAGE_ID;
+    bytes32 public DCAP_RISC0_IMAGE_ID;
 
     constructor(
         address enclaveIdDaoAddr,
@@ -37,12 +38,32 @@ contract AutomataDcapV3Attestation is IAttestation, EnclaveIdBase, PEMCertChainB
         PEMCertChainBase(pckHelperAddr, crlHelperAddr, pcsDaoAddr)
         TCBInfoBase(tcbDaoAddr, tcbHelperAddr)
     {
+        _initializeOwner(msg.sender);
         verifier = IRiscZeroVerifier(risc0Verifier);
         DCAP_RISC0_IMAGE_ID = imageId;
     }
 
     error Failed_To_Verify_Quote();
     error Invalid_Collateral_Hashes();
+
+    function updateConfig(
+        address enclaveIdDaoAddr,
+        address enclaveIdHelperAddr,
+        address pckHelperAddr,
+        address tcbDaoAddr,
+        address tcbHelperAddr,
+        address crlHelperAddr,
+        address pcsDaoAddr
+    ) external onlyOwner {
+        _setEnclaveIdBaseConfig(enclaveIdDaoAddr, enclaveIdHelperAddr);
+        _setCertBaseConfig(pckHelperAddr, crlHelperAddr, pcsDaoAddr);
+        _setTcbBaseConfig(tcbDaoAddr, tcbHelperAddr);
+    }
+
+    function updateRisc0Config(address risc0Verifier, bytes32 imageId) external onlyOwner {
+        verifier = IRiscZeroVerifier(risc0Verifier);
+        DCAP_RISC0_IMAGE_ID = imageId;
+    }
 
     function verifyAndAttestOnChain(bytes calldata input) external view override returns (bytes memory output) {
         bool verified;
@@ -155,7 +176,7 @@ contract AutomataDcapV3Attestation is IAttestation, EnclaveIdBase, PEMCertChainB
                 parsedCerts[i] = pckHelper.parseX509DER(certs[i]);
                 // additional parsing for PCKCert
                 if (i == 0) {
-                    pckTcb = parsePck(certs[0], parsedCerts[0].extensionPtr);
+                    pckTcb = _parsePck(certs[0], parsedCerts[0].extensionPtr);
                 }
             }
         }

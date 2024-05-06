@@ -12,10 +12,14 @@ import {
 import {EnclaveIdentityDao} from "@automata-network/on-chain-pccs/dao/EnclaveIdentityDao.sol";
 
 abstract contract EnclaveIdBase {
-    EnclaveIdentityDao public immutable enclaveIdDao;
-    EnclaveIdentityHelper public immutable enclaveIdHelper;
+    EnclaveIdentityDao public enclaveIdDao;
+    EnclaveIdentityHelper public enclaveIdHelper;
 
     constructor(address _enclaveIdDao, address _enclaveIdHelper) {
+        _setEnclaveIdBaseConfig(_enclaveIdDao, _enclaveIdHelper);
+    }
+
+    function _setEnclaveIdBaseConfig(address _enclaveIdDao, address _enclaveIdHelper) internal {
         enclaveIdDao = EnclaveIdentityDao(_enclaveIdDao);
         enclaveIdHelper = EnclaveIdentityHelper(_enclaveIdHelper);
     }

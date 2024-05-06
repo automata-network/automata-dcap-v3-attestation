@@ -19,9 +19,9 @@ struct PCKCertTCB {
 abstract contract PEMCertChainBase {
     using BytesUtils for bytes;
 
-    PCKHelper public immutable pckHelper;
-    X509CRLHelper public immutable crlHelper;
-    PcsDao public immutable pcsDao;
+    PCKHelper public pckHelper;
+    X509CRLHelper public crlHelper;
+    PcsDao public pcsDao;
 
     string constant PLATFORM_ISSUER_NAME = "Intel SGX PCK Platform CA";
     string constant PROCESSOR_ISSUER_NAME = "Intel SGX PCK Processor CA";
@@ -31,12 +31,16 @@ abstract contract PEMCertChainBase {
     bytes32 constant ROOTCA_PUBKEY_HASH = 0x89f72d7c488e5b53a77c23ebcb36970ef7eb5bcf6658e9b8292cfbe4703a8473;
 
     constructor(address _pckHelper, address _crlHelper, address _pcsDao) {
+        _setCertBaseConfig(_pckHelper, _crlHelper, _pcsDao);
+    }
+
+    function _setCertBaseConfig(address _pckHelper, address _crlHelper, address _pcsDao) internal {
         pckHelper = PCKHelper(_pckHelper);
         crlHelper = X509CRLHelper(_crlHelper);
         pcsDao = PcsDao(_pcsDao);
     }
 
-    function parsePck(bytes memory der, uint256 extensionPtr) internal view returns (PCKCertTCB memory pckTCB) {
+    function _parsePck(bytes memory der, uint256 extensionPtr) internal view returns (PCKCertTCB memory pckTCB) {
         (pckTCB.pcesvn, pckTCB.cpusvns, pckTCB.fmspcBytes, pckTCB.pceidBytes) =
             pckHelper.parsePckExtension(der, extensionPtr);
     }

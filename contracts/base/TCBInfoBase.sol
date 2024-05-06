@@ -8,13 +8,17 @@ import {FmspcTcbDao} from "@automata-network/on-chain-pccs/dao/FmspcTcbDao.sol";
 import {PCKCertTCB} from "./PEMCertChainBase.sol";
 
 abstract contract TCBInfoBase {
-    FmspcTcbDao public immutable tcbDao;
-    FmspcTcbHelper public immutable tcbHelper;
+    FmspcTcbDao public tcbDao;
+    FmspcTcbHelper public tcbHelper;
 
     // https://github.com/intel/SGXDataCenterAttestationPrimitives/blob/e7604e02331b3377f3766ed3653250e03af72d45/QuoteVerification/QVL/Src/AttestationLibrary/src/CertVerification/X509Constants.h#L64
     uint256 constant CPUSVN_LENGTH = 16;
 
     constructor(address _tcbDao, address _tcbHelper) {
+        _setTcbBaseConfig(_tcbDao, _tcbHelper);
+    }
+
+    function _setTcbBaseConfig(address _tcbDao, address _tcbHelper) internal {
         tcbDao = FmspcTcbDao(_tcbDao);
         tcbHelper = FmspcTcbHelper(_tcbHelper);
     }
