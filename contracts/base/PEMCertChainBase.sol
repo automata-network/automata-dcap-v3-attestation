@@ -115,4 +115,13 @@ abstract contract PEMCertChainBase {
             (certHash,) = abi.decode(data, (bytes32, bytes));
         }
     }
+
+    function _getCrlHash(CA ca) internal view returns (bool success, bytes32 crlHash) {
+        bytes32 attestationId = pcsDao.pcsCrlAttestations(ca);
+        success = attestationId != bytes32(0);
+        if (success) {
+            bytes memory data = pcsDao.getAttestedData(attestationId);
+            (crlHash,) = abi.decode(data, (bytes32, bytes));
+        }
+    }
 }

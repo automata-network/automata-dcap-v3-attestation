@@ -85,9 +85,10 @@ contract AutomataDcapV3Attestation is IAttestation, EnclaveIdBase, PEMCertChainB
             revert Failed_To_Verify_Quote();
         }
 
-        (bytes32 tcbSigningCertHash, bytes32 rootCaHash) = _getCollateralHashesFromJournal(journal);
+        (bytes32 tcbSigningCertHash, bytes32 rootCaHash, bytes32 pckCrlHash, bytes32 rootCrlHash) =
+            _getCollateralHashesFromJournal(journal);
 
-        bool verifyHashes = _checkCollateralHashes(tcbSigningCertHash, rootCaHash);
+        bool verifyHashes = _checkCollateralHashes(tcbSigningCertHash, rootCaHash, pckCrlHash, rootCrlHash);
         if (!verifyHashes) {
             revert Invalid_Collateral_Hashes();
         }
@@ -278,20 +279,38 @@ contract AutomataDcapV3Attestation is IAttestation, EnclaveIdBase, PEMCertChainB
     function _getCollateralHashesFromJournal(bytes calldata journal)
         private
         pure
-        returns (bytes32 tcbSigningCertHash, bytes32 rootCaHash)
+        returns (bytes32 tcbSigningCertHash, bytes32 rootCaHash, bytes32 pckCrlHash, bytes32 rootCrlHash)
     {
         tcbSigningCertHash = bytes32(journal[199:231]);
         rootCaHash = bytes32(journal[231:263]);
+        pckCrlHash = bytes32(journal[263:295]);
+        rootCrlHash = bytes32(journal[295:327]);
     }
 
-    function _checkCollateralHashes(bytes32 tcbSigningCertHash, bytes32 rootCaHash)
-        private
-        view
-        returns (bool success)
-    {
+    function _checkCollateralHashes(
+        bytes32 tcbSigningCertHash,
+        bytes32 rootCaHash,
+        bytes32 pckCrlHash,
+        bytes32 rootCrlHash
+    ) private view returns (bool success) {
         (bool tcbSigningFound, bytes32 expectedTcbSigningHash) = _getCertHash(CA.SIGNING);
+        if (!tcbSigningFound || tcbSigningCertHash != expectedTcbSigningHash) {
+            return false;
+        }
         (bool rootCaFound, bytes32 expectedRootCaHash) = _getCertHash(CA.ROOT);
-        success = tcbSigningFound && rootCaFound && expectedTcbSigningHash == tcbSigningCertHash
-            && expectedRootCaHash == rootCaHash;
+        if (!rootCaFound || rootCaHash != expectedRootCaHash) {
+            return false;
+        }
+        (, bytes32 expectedPckPlatformCrlHash) = _getCrlHash(CA.PLATFORM);
+        (, bytes32 expectedPckProcessorCrlHash) = _getCrlHash(CA.PROCESSOR);
+        if (pckCrlHash != expectedPckPlatformCrlHash && pckCrlHash != expectedPckProcessorCrlHash) {
+            return false;
+        }
+        (bool rootCrlFound, bytes32 expectedRootCrlHash) = _getCrlHash(CA.ROOT);
+        if (!rootCrlFound || rootCrlHash != expectedRootCrlHash) {
+            return false;
+        }
+
+        return true;
     }
 }
