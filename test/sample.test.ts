@@ -7,13 +7,13 @@ import {
     FMSPC_TCB_DAO_PORTAL,
     X509_CRL_HELPER,
     PCS_DAO_PORTAL,
-    RISC0_DCAP_VERIFIER
+    RISC0_DCAP_VERIFIER,
+    DCAP_IMAGE_ID
 } from './utils/pccs';
 import { AutomataDcapV3Attestation } from '../typechain-types';
 
 describe("AutomataDcapV3Attestation sample", () => {
     let attestationAddr: string = '';
-    let imageId: string = '';
 
     before(async() => {
         // Step 0: check pinned timestamp from config
@@ -31,7 +31,7 @@ describe("AutomataDcapV3Attestation sample", () => {
             X509_CRL_HELPER,
             PCS_DAO_PORTAL,
             RISC0_DCAP_VERIFIER,
-            imageId
+            DCAP_IMAGE_ID
         ]);
         attestationAddr = await attestationContract.getAddress();
         console.log(`AutomataDcapV3Attestation deployed at: ${attestationAddr}`)
@@ -50,7 +50,8 @@ describe("AutomataDcapV3Attestation sample", () => {
                 1, // TCB_SW_HARDENING_NEEDED
                 '0x46049af725ec3986eeb788693df7bc5f14d3f2705106a19cd09b9d89237db1a0', // MRENCLAVE
                 '0xef69011f29043f084e99ce420bfebdfa410aee1e132014e7ceff29efa9659bd9', // MRSIGNER
-                '0x' + '0'.repeat(64 * 2) // REPORT_DATA
+                '0x' + '0'.repeat(64 * 2), // REPORT_DATA
+                '0x00606a000000' // fmspc
             ]
         )
 

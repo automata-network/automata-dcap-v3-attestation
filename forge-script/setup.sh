@@ -2,8 +2,6 @@
 
 source .env
 
-RPC_URL="https://rpc.goerli.linea.build"
-
 DEPLOY_SCRIPT="DeployDCAPScript"
 FORGE_COMMAND_SUFFIX="--broadcast --rpc-url $RPC_URL"
 

@@ -11,10 +11,9 @@ const {
   FMSPC_TCB_HELPER,
   X509_CRL_HELPER,
   PCS_DAO_PORTAL,
-  RISC0_DCAP_VERIFIER
+  RISC0_DCAP_VERIFIER,
+  DCAP_IMAGE_ID
 } = process.env;
-
-const imageId = "";
 
 async function main() {
   const attestation = await ethers.deployContract("AutomataDcapV3Attestation", [
@@ -26,7 +25,7 @@ async function main() {
     X509_CRL_HELPER,
     PCS_DAO_PORTAL,
     RISC0_DCAP_VERIFIER,
-    imageId
+    DCAP_IMAGE_ID
   ], {});
   await attestation.waitForDeployment();
   const attestationAddr = await attestation.getAddress();

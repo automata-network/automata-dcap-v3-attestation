@@ -18,7 +18,8 @@ export const {
   PCS_DAO_PORTAL,
   ENCLAVE_IDENTITY_HELPER,
   FMSPC_TCB_HELPER,
-  RISC0_DCAP_VERIFIER
+  RISC0_DCAP_VERIFIER,
+  DCAP_IMAGE_ID
 } = process.env;
 
 type SetupReturnType = {

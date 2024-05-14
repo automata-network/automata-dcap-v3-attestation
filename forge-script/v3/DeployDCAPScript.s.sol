@@ -18,7 +18,7 @@ contract DeployDCAPScript is Script {
         address risc0Verifier = vm.envAddress("RISC0_DCAP_VERIFIER");
         vm.broadcast(deployerKey);
 
-        bytes32 imageId = 0x098c60932aee7bc8163607f7d99b9378647eb905e2600fc3950af27b137bf971;
+        bytes32 imageId = vm.envBytes32("DCAP_IMAGE_ID");
 
         AutomataDcapV3Attestation attestation = new AutomataDcapV3Attestation(
             enclaveIdDaoAddr,

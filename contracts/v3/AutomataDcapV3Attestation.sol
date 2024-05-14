@@ -17,6 +17,15 @@ contract AutomataDcapV3Attestation is IAttestation, EnclaveIdBase, PEMCertChainB
     using BytesUtils for bytes;
     using LibString for bytes;
 
+    /// @dev partial data extracted from the journal to verify on-chain
+    struct CollateralToBeVerified {
+        bytes32 rootCaHash;
+        bytes32 tcbSigningHash;
+        bytes32 rootCaCrlHash;
+        bytes32 platformCrlHash;
+        bytes32 processorCrlHash;
+    }
+
     /// @notice RISC Zero verifier contract address.
     IRiscZeroVerifier public verifier;
 
@@ -85,10 +94,9 @@ contract AutomataDcapV3Attestation is IAttestation, EnclaveIdBase, PEMCertChainB
             revert Failed_To_Verify_Quote();
         }
 
-        (bytes32 tcbSigningCertHash, bytes32 rootCaHash, bytes32 pckCrlHash, bytes32 rootCrlHash) =
-            _getCollateralHashesFromJournal(journal);
+        (CollateralToBeVerified memory collateral) = _getCollateralHashesFromJournal(journal);
 
-        bool verifyHashes = _checkCollateralHashes(tcbSigningCertHash, rootCaHash, pckCrlHash, rootCrlHash);
+        bool verifyHashes = _checkCollateralHashes(collateral);
         if (!verifyHashes) {
             revert Invalid_Collateral_Hashes();
         }
@@ -224,7 +232,8 @@ contract AutomataDcapV3Attestation is IAttestation, EnclaveIdBase, PEMCertChainB
             tcbStatus,
             v3quote.localEnclaveReport.mrEnclave,
             v3quote.localEnclaveReport.mrSigner,
-            v3quote.localEnclaveReport.reportData
+            v3quote.localEnclaveReport.reportData,
+            bytes6(pckTcb.fmspcBytes)
         );
 
         return (true, output);
@@ -270,44 +279,56 @@ contract AutomataDcapV3Attestation is IAttestation, EnclaveIdBase, PEMCertChainB
         TCBStatus tcbStatus,
         bytes32 isvMrEnclave,
         bytes32 isvMrSigner,
-        bytes memory isvReportData
+        bytes memory isvReportData,
+        bytes6 fmspcBytes
     ) private pure returns (bytes memory serialized) {
         require(isvReportData.length < 65, "invalid enclave report data length");
-        serialized = abi.encodePacked(tcbStatus, isvMrEnclave, isvMrSigner, isvReportData);
+        serialized = abi.encodePacked(tcbStatus, isvMrEnclave, isvMrSigner, isvReportData, fmspcBytes);
     }
 
+    /// @dev the journal output has the following format:
+    /// @dev serial_output (VerifiedOutput) = 135 bytes
+    /// @dev current_time = 8 bytes
+    /// @dev tcbinfov2_hash = 32 bytes
+    /// @dev qeidentityv2_hash = 32 bytes
+    /// ==============================================
+    /// @notice the values below are extracted and verified on-chain
+    /// @dev sgx_intel_root_ca_cert_hash = 32 bytes
+    /// @dev sgx_tcb_signing_cert_hash = 32 bytes
+    /// @dev sgx_tcb_intel_root_ca_crl_hash = 32 bytes
+    /// @dev sgx_pck_platform_crl_hash = 32 bytes
+    /// @dev sgx_pck_processor_crl_hash = 32 bytes
     function _getCollateralHashesFromJournal(bytes calldata journal)
         private
         pure
-        returns (bytes32 tcbSigningCertHash, bytes32 rootCaHash, bytes32 pckCrlHash, bytes32 rootCrlHash)
+        returns (CollateralToBeVerified memory output)
     {
-        tcbSigningCertHash = bytes32(journal[199:231]);
-        rootCaHash = bytes32(journal[231:263]);
-        pckCrlHash = bytes32(journal[263:295]);
-        rootCrlHash = bytes32(journal[295:327]);
+        output.rootCaHash = bytes32(journal[207:239]);
+        output.tcbSigningHash = bytes32(journal[239:271]);
+        output.rootCaCrlHash = bytes32(journal[271:303]);
+        output.platformCrlHash = bytes32(journal[303:335]);
+        output.processorCrlHash = bytes32(journal[335:367]);
     }
 
-    function _checkCollateralHashes(
-        bytes32 tcbSigningCertHash,
-        bytes32 rootCaHash,
-        bytes32 pckCrlHash,
-        bytes32 rootCrlHash
-    ) private view returns (bool success) {
+    function _checkCollateralHashes(CollateralToBeVerified memory output) private view returns (bool success) {
         (bool tcbSigningFound, bytes32 expectedTcbSigningHash) = _getCertHash(CA.SIGNING);
-        if (!tcbSigningFound || tcbSigningCertHash != expectedTcbSigningHash) {
+        if (!tcbSigningFound || output.tcbSigningHash != expectedTcbSigningHash) {
             return false;
         }
         (bool rootCaFound, bytes32 expectedRootCaHash) = _getCertHash(CA.ROOT);
-        if (!rootCaFound || rootCaHash != expectedRootCaHash) {
+        if (!rootCaFound || output.rootCaHash != expectedRootCaHash) {
             return false;
         }
         (, bytes32 expectedPckPlatformCrlHash) = _getCrlHash(CA.PLATFORM);
         (, bytes32 expectedPckProcessorCrlHash) = _getCrlHash(CA.PROCESSOR);
-        if (pckCrlHash != expectedPckPlatformCrlHash && pckCrlHash != expectedPckProcessorCrlHash) {
+        if (
+            output.platformCrlHash != expectedPckPlatformCrlHash
+                || output.processorCrlHash != expectedPckProcessorCrlHash
+        ) {
             return false;
         }
         (bool rootCrlFound, bytes32 expectedRootCrlHash) = _getCrlHash(CA.ROOT);
-        if (!rootCrlFound || rootCrlHash != expectedRootCrlHash) {
+        if (!rootCrlFound || output.rootCaCrlHash != expectedRootCrlHash) {
             return false;
         }
 
