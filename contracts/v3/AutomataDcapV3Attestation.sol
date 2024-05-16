@@ -9,7 +9,6 @@ import {TCBInfoBase, TCBLevelsObj, TCBStatus} from "../base/TCBInfoBase.sol";
 import {V3Struct} from "./QuoteV3Auth/V3Struct.sol";
 import {V3Parser} from "./QuoteV3Auth/V3Parser.sol";
 
-import {P256} from "p256-verifier/P256.sol";
 import {IRiscZeroVerifier} from "risc0/IRiscZeroVerifier.sol";
 import {Ownable} from "solady/auth/Ownable.sol";
 
@@ -259,20 +258,6 @@ contract AutomataDcapV3Attestation is IAttestation, EnclaveIdBase, PEMCertChainB
         } else {
             return false;
         }
-    }
-
-    function _ecdsaVerify(bytes32 message, bytes memory signature, bytes memory key)
-        private
-        view
-        returns (bool verified)
-    {
-        verified = P256.verifySignatureAllowMalleability(
-            message,
-            uint256(bytes32(signature.substring(0, 32))),
-            uint256(bytes32(signature.substring(32, 32))),
-            uint256(bytes32(key.substring(0, 32))),
-            uint256(bytes32(key.substring(32, 32)))
-        );
     }
 
     function _serializeOutput(

@@ -7,7 +7,6 @@ import {LibString} from "solady/utils/LibString.sol";
 import {PCKHelper, X509CertObj} from "@automata-network/on-chain-pccs/helper/PCKHelper.sol";
 import {X509CRLHelper} from "@automata-network/on-chain-pccs/helper/X509CRLHelper.sol";
 import {PcsDao, CA} from "@automata-network/on-chain-pccs/dao/PcsDao.sol";
-import {P256} from "p256-verifier/P256.sol";
 
 struct PCKCertTCB {
     uint16 pcesvn;
@@ -22,6 +21,9 @@ abstract contract PEMCertChainBase {
     PCKHelper public pckHelper;
     X509CRLHelper public crlHelper;
     PcsDao public pcsDao;
+
+    /// @dev https://github.com/daimo-eth/p256-verifier/blob/master/src/P256.sol
+    address internal constant P256_VERIFIER = 0xc2b78104907F722DABAc4C69f826a522B2754De4;
 
     string constant PLATFORM_ISSUER_NAME = "Intel SGX PCK Platform CA";
     string constant PROCESSOR_ISSUER_NAME = "Intel SGX PCK Processor CA";
@@ -85,12 +87,10 @@ abstract contract PEMCertChainBase {
             }
 
             {
-                verified = P256.verifySignatureAllowMalleability(
+                verified = _ecdsaVerify(
                     sha256(certs[i].tbs),
-                    uint256(bytes32(certs[i].signature.substring(0, 32))),
-                    uint256(bytes32(certs[i].signature.substring(32, 32))),
-                    uint256(bytes32(issuer.subjectPublicKey.substring(0, 32))),
-                    uint256(bytes32(issuer.subjectPublicKey.substring(32, 32)))
+                    certs[i].signature,
+                    issuer.subjectPublicKey
                 );
                 if (!verified) {
                     break;
@@ -123,5 +123,23 @@ abstract contract PEMCertChainBase {
             bytes memory data = pcsDao.getAttestedData(attestationId, true);
             crlHash = bytes32(data);
         }
+    }
+
+    function _ecdsaVerify(bytes32 messageHash, bytes memory signature, bytes memory key)
+        internal
+        view
+        returns (bool verified)
+    {
+        bytes memory args = abi.encode(
+            messageHash,
+            uint256(bytes32(signature.substring(0, 32))),
+            uint256(bytes32(signature.substring(32, 32))),
+            uint256(bytes32(key.substring(0, 32))),
+            uint256(bytes32(key.substring(32, 32)))
+        );
+        (bool success, bytes memory ret) = P256_VERIFIER.staticcall(args);
+        assert(success); // never reverts, always returns 0 or 1
+
+        verified =  abi.decode(ret, (uint256)) == 1;
     }
 }

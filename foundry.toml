@@ -14,9 +14,11 @@ remappings = [
     # foundry is not able to detect this particular remapping for some reason...
     "openzeppelin/=lib/risc0-ethereum/lib/openzeppelin-contracts/"
 ]
-solc = "0.8.21"
+solc = "0.8.24"
 optimizer = true
 optimizer_runs = 200
 
-# NOTE: disable viaIR for linea for now, because it does not pass code verification
-# viaIR = true
+# NOTE: Be very careful with this when deploying, because I have had issues 
+# performing contract verification
+# https://github.com/foundry-rs/foundry/issues/3507
+viaIR = true

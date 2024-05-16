@@ -9,14 +9,16 @@ const { FORK_URL, PRIVATE_KEY } = process.env;
 
 const config: HardhatUserConfig = {
   solidity: {
-    version: "0.8.21",
+    version: "0.8.24",
     settings: {
       optimizer: {
         enabled: true,
-        runs: Math.pow(2, 32) - 1
+        runs: 200
       },
-      // NOTE: disable viaIR for linea for now, because it does not pass code verification
-      // viaIR: true
+      // NOTE: Be very careful with this when deploying, because I have had issues 
+      // performing contract verification
+      // https://github.com/foundry-rs/foundry/issues/3507
+      viaIR: true
     }
   },
   networks: {
