@@ -111,8 +111,8 @@ abstract contract PEMCertChainBase {
         bytes32 attestationId = pcsDao.pcsCertAttestations(ca);
         success = attestationId != bytes32(0);
         if (success) {
-            bytes memory data = pcsDao.getAttestedData(attestationId);
-            (certHash,) = abi.decode(data, (bytes32, bytes));
+            bytes memory data = pcsDao.getAttestedData(attestationId, true);
+            certHash = bytes32(data);
         }
     }
 
@@ -120,8 +120,8 @@ abstract contract PEMCertChainBase {
         bytes32 attestationId = pcsDao.pcsCrlAttestations(ca);
         success = attestationId != bytes32(0);
         if (success) {
-            bytes memory data = pcsDao.getAttestedData(attestationId);
-            (crlHash,) = abi.decode(data, (bytes32, bytes));
+            bytes memory data = pcsDao.getAttestedData(attestationId, true);
+            crlHash = bytes32(data);
         }
     }
 }

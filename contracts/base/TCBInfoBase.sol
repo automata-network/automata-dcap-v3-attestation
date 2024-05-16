@@ -28,9 +28,8 @@ abstract contract TCBInfoBase {
         bytes32 attestationId = tcbDao.fmspcTcbInfoAttestations(key);
         success = attestationId != bytes32(0);
         if (success) {
-            bytes memory data = tcbDao.getAttestedData(attestationId);
-            (,,,, tcbLevels,,,) =
-                abi.decode(data, (uint256, uint256, uint256, uint256, TCBLevelsObj[], bytes32, string, bytes));
+            (, bytes memory data) = abi.decode(tcbDao.getAttestedData(attestationId, false), (bytes32, bytes));
+            (,,,, tcbLevels,,) = abi.decode(data, (uint256, uint256, uint256, uint256, TCBLevelsObj[], string, bytes));
         }
     }
 

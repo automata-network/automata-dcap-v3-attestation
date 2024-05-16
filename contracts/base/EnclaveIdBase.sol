@@ -34,9 +34,9 @@ abstract contract EnclaveIdBase {
     ) internal view returns (bool, EnclaveIdTcbStatus status) {
         bytes32 key = keccak256(abi.encodePacked(uint256(0), uint256(3)));
         bytes32 attestationId = enclaveIdDao.enclaveIdentityAttestations(key);
-        bytes memory data = enclaveIdDao.getAttestedData(attestationId);
+        (, bytes memory data) = abi.decode(enclaveIdDao.getAttestedData(attestationId, false), (bytes32, bytes));
 
-        (IdentityObj memory identity,,,) = abi.decode(data, (IdentityObj, bytes32, string, bytes));
+        (IdentityObj memory identity,,) = abi.decode(data, (IdentityObj, string, bytes));
 
         bool miscselectMatched = enclaveReportMiscselect & identity.miscselectMask == identity.miscselect;
         bool attributesMatched = enclaveReportAttributes & identity.attributesMask == identity.attributes;
