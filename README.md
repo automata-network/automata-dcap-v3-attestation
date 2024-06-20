@@ -71,8 +71,9 @@ To provide additional test cases, please include those in the `/test` directory.
 
 To provide additional scripts, please include those in the `/scripts` directory. -->
 
-### Project Utilization
 
-Our project is currently being widely used by [Taiko](
-https://github.com/taikoxyz/taiko-mono/tree/main/packages/protocol/contracts/automata-attestation
-) and [Flashbots](https://collective.flashbots.net/t/demystifying-remote-attestation-by-taking-it-on-chain/2629/2).
+## Projects using AutomataDcapV3Attestation
+
+* [Flashbots](https://writings.flashbots.net/suave-tee-coprocessor)
+* [Taiko](
+https://github.com/taikoxyz/taiko-mono/tree/main/packages/protocol/contracts/automata-attestation)
