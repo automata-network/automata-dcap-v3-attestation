@@ -46,12 +46,12 @@ To provide additional scripts, please include those in the `/forge-script` direc
 - `AutomataDcapV3Attestation` deployment
 
 ```bash
-forge script DeployDCAPScript --sig "deployAttestation()" --broadcast --rpc-url $RPC_URL
+forge script DeployDCAPScript --broadcast --rpc-url $RPC_URL
 ```
 
 ---
 
-## Building With Hardhat
+<!-- ## Building With Hardhat
 
 Compile the contract:
 
@@ -69,4 +69,8 @@ To deploy the contract on a live network, please configure `hardhat.config.ts`, 
 
 To provide additional test cases, please include those in the `/test` directory.
 
-To provide additional scripts, please include those in the `/scripts` directory.
+To provide additional scripts, please include those in the `/scripts` directory. -->
+
+Used by [Taiko](
+https://github.com/taikoxyz/taiko-mono/tree/main/packages/protocol/contracts/automata-attestation
+) and [Flashbots](https://collective.flashbots.net/t/demystifying-remote-attestation-by-taking-it-on-chain/2629/2)
