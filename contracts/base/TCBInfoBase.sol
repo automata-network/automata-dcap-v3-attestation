@@ -1,9 +1,14 @@
 //SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 
-import {FmspcTcbHelper, TCBLevelsObj, TCBStatus} from "@automata-network/on-chain-pccs/helper/FmspcTcbHelper.sol";
-import {EnclaveIdTcbStatus} from "@automata-network/on-chain-pccs/helper/EnclaveIdentityHelper.sol";
-import {FmspcTcbDao} from "@automata-network/on-chain-pccs/dao/FmspcTcbDao.sol";
+import {
+    FmspcTcbHelper,
+    TCBLevelsObj,
+    TCBStatus,
+    TcbInfoBasic
+} from "@automata-network/on-chain-pccs/helpers/FmspcTcbHelper.sol";
+import {EnclaveIdTcbStatus} from "@automata-network/on-chain-pccs/helpers/EnclaveIdentityHelper.sol";
+import {FmspcTcbDao} from "@automata-network/on-chain-pccs/bases/FmspcTcbDao.sol";
 
 import {PCKCertTCB} from "./PEMCertChainBase.sol";
 
@@ -24,12 +29,12 @@ abstract contract TCBInfoBase {
     }
 
     function _getTcbInfo(string memory fmspc) internal view returns (bool success, TCBLevelsObj[] memory tcbLevels) {
-        bytes32 key = keccak256(abi.encodePacked(uint256(0), fmspc, uint256(2)));
+        bytes32 key = keccak256(abi.encodePacked(uint8(0), fmspc, uint32(2)));
         bytes32 attestationId = tcbDao.fmspcTcbInfoAttestations(key);
         success = attestationId != bytes32(0);
         if (success) {
-            (, bytes memory data) = abi.decode(tcbDao.getAttestedData(attestationId, false), (bytes32, bytes));
-            (,,,, tcbLevels,,) = abi.decode(data, (uint256, uint256, uint256, uint256, TCBLevelsObj[], string, bytes));
+            bytes memory data = tcbDao.getAttestedData(attestationId);
+            (, tcbLevels,,) = abi.decode(data, (TcbInfoBasic, TCBLevelsObj[], string, bytes));
         }
     }
 
@@ -41,7 +46,7 @@ abstract contract TCBInfoBase {
         for (uint256 i = 0; i < tcbLevels.length; i++) {
             TCBLevelsObj memory current = tcbLevels[i];
             bool pceSvnIsHigherOrGreater = pckTcb.pcesvn >= current.pcesvn;
-            bool cpuSvnsAreHigherOrGreater = _isCpuSvnHigherOrGreater(pckTcb.cpusvns, current.cpusvnsArr);
+            bool cpuSvnsAreHigherOrGreater = _isCpuSvnHigherOrGreater(pckTcb.cpusvns, current.sgxComponentCpuSvns);
             if (pceSvnIsHigherOrGreater && cpuSvnsAreHigherOrGreater) {
                 bool tcbIsRevoked = status == TCBStatus.TCB_REVOKED
                     || qeTcbStatus == EnclaveIdTcbStatus.SGX_ENCLAVE_REPORT_ISVSVN_REVOKED;
@@ -65,7 +70,7 @@ abstract contract TCBInfoBase {
         return (true, TCBStatus.TCB_UNRECOGNIZED);
     }
 
-    function _isCpuSvnHigherOrGreater(uint8[] memory pckCpuSvns, uint256[] memory tcbCpuSvns)
+    function _isCpuSvnHigherOrGreater(uint8[] memory pckCpuSvns, uint8[] memory tcbCpuSvns)
         private
         pure
         returns (bool)
@@ -74,7 +79,7 @@ abstract contract TCBInfoBase {
             return false;
         }
         for (uint256 i = 0; i < CPUSVN_LENGTH; i++) {
-            if (uint256(pckCpuSvns[i]) < tcbCpuSvns[i]) {
+            if (pckCpuSvns[i] < tcbCpuSvns[i]) {
                 return false;
             }
         }

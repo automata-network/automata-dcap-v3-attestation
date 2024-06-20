@@ -8,8 +8,8 @@ import {
     EnclaveId,
     Tcb,
     EnclaveIdTcbStatus
-} from "@automata-network/on-chain-pccs/helper/EnclaveIdentityHelper.sol";
-import {EnclaveIdentityDao} from "@automata-network/on-chain-pccs/dao/EnclaveIdentityDao.sol";
+} from "@automata-network/on-chain-pccs/helpers/EnclaveIdentityHelper.sol";
+import {EnclaveIdentityDao} from "@automata-network/on-chain-pccs/bases/EnclaveIdentityDao.sol";
 
 abstract contract EnclaveIdBase {
     EnclaveIdentityDao public enclaveIdDao;
@@ -34,7 +34,7 @@ abstract contract EnclaveIdBase {
     ) internal view returns (bool, EnclaveIdTcbStatus status) {
         bytes32 key = keccak256(abi.encodePacked(uint256(0), uint256(3)));
         bytes32 attestationId = enclaveIdDao.enclaveIdentityAttestations(key);
-        (, bytes memory data) = abi.decode(enclaveIdDao.getAttestedData(attestationId, false), (bytes32, bytes));
+        bytes memory data = enclaveIdDao.getAttestedData(attestationId);
 
         (IdentityObj memory identity,,) = abi.decode(data, (IdentityObj, string, bytes));
 

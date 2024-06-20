@@ -81,17 +81,13 @@ contract AutomataDcapV3Attestation is IAttestation, EnclaveIdBase, PEMCertChainB
         }
     }
 
-    function verifyAndAttestWithZKProof(bytes calldata journal, bytes32 postStateDigest, bytes calldata seal)
+    function verifyAndAttestWithZKProof(bytes calldata journal, bytes calldata seal)
         external
         view
         override
         returns (bytes memory output)
     {
-        bool verified = verifier.verify(seal, DCAP_RISC0_IMAGE_ID, postStateDigest, sha256(journal));
-
-        if (!verified) {
-            revert Failed_To_Verify_Quote();
-        }
+        verifier.verify(seal, DCAP_RISC0_IMAGE_ID, sha256(journal));
 
         (CollateralToBeVerified memory collateral) = _getCollateralHashesFromJournal(journal);
 
@@ -194,6 +190,9 @@ contract AutomataDcapV3Attestation is IAttestation, EnclaveIdBase, PEMCertChainB
         {
             bool tcbInfoFound;
             (tcbInfoFound, tcbLevels) = _getTcbInfo(pckTcb.fmspcBytes.toHexStringNoPrefix());
+            if (!tcbInfoFound) {
+                return (false, output);
+            }
         }
 
         // Step 5: Verify TCB Level

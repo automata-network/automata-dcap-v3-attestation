@@ -21,12 +21,18 @@ interface IAttestation {
     function verifyAndAttestOnChain(bytes calldata input) external returns (bytes memory output);
 
     /**
-     * @param journal -
-     * @param postStateDigest - A hash of the final memory state. Required to run the verifier, but
-     *     otherwise can be left unconstrained for most use cases.
+     * @param journal - The output of the Guest program, this includes:
+     * - VerifiedOutput struct
+     * - TcbInfo hash
+     * - QEID hash
+     * - RootCA hash
+     * - TCB Signing CA hash
+     * - Root CRL hash
+     * - Platform CRL hash
+     * - Processor CRL hash
      * @param seal - The encoded cryptographic proof (i.e. SNARK).
      */
-    function verifyAndAttestWithZKProof(bytes calldata journal, bytes32 postStateDigest, bytes calldata seal)
+    function verifyAndAttestWithZKProof(bytes calldata journal, bytes calldata seal)
         external
         returns (bytes memory output);
 }

@@ -4,9 +4,9 @@ pragma solidity ^0.8.0;
 import {BytesUtils} from "../utils/BytesUtils.sol";
 
 import {LibString} from "solady/utils/LibString.sol";
-import {PCKHelper, X509CertObj} from "@automata-network/on-chain-pccs/helper/PCKHelper.sol";
-import {X509CRLHelper} from "@automata-network/on-chain-pccs/helper/X509CRLHelper.sol";
-import {PcsDao, CA} from "@automata-network/on-chain-pccs/dao/PcsDao.sol";
+import {PCKHelper, X509CertObj} from "@automata-network/on-chain-pccs/helpers/PCKHelper.sol";
+import {X509CRLHelper} from "@automata-network/on-chain-pccs/helpers/X509CRLHelper.sol";
+import {PcsDao, CA} from "@automata-network/on-chain-pccs/bases/PcsDao.sol";
 
 struct PCKCertTCB {
     uint16 pcesvn;
@@ -87,11 +87,7 @@ abstract contract PEMCertChainBase {
             }
 
             {
-                verified = _ecdsaVerify(
-                    sha256(certs[i].tbs),
-                    certs[i].signature,
-                    issuer.subjectPublicKey
-                );
+                verified = _ecdsaVerify(sha256(certs[i].tbs), certs[i].signature, issuer.subjectPublicKey);
                 if (!verified) {
                     break;
                 }
@@ -111,8 +107,7 @@ abstract contract PEMCertChainBase {
         bytes32 attestationId = pcsDao.pcsCertAttestations(ca);
         success = attestationId != bytes32(0);
         if (success) {
-            bytes memory data = pcsDao.getAttestedData(attestationId, true);
-            certHash = bytes32(data);
+            certHash = pcsDao.getCollateralHash(attestationId);
         }
     }
 
@@ -120,8 +115,7 @@ abstract contract PEMCertChainBase {
         bytes32 attestationId = pcsDao.pcsCrlAttestations(ca);
         success = attestationId != bytes32(0);
         if (success) {
-            bytes memory data = pcsDao.getAttestedData(attestationId, true);
-            crlHash = bytes32(data);
+            crlHash = pcsDao.getCollateralHash(attestationId);
         }
     }
 
@@ -140,6 +134,6 @@ abstract contract PEMCertChainBase {
         (bool success, bytes memory ret) = P256_VERIFIER.staticcall(args);
         assert(success); // never reverts, always returns 0 or 1
 
-        verified =  abi.decode(ret, (uint256)) == 1;
+        verified = abi.decode(ret, (uint256)) == 1;
     }
 }
