@@ -21,8 +21,7 @@ contract AutomataDcapV3Attestation is IAttestation, EnclaveIdBase, PEMCertChainB
         bytes32 rootCaHash;
         bytes32 tcbSigningHash;
         bytes32 rootCaCrlHash;
-        bytes32 platformCrlHash;
-        bytes32 processorCrlHash;
+        bytes32 pckCrlHash;
     }
 
     /// @notice RISC Zero verifier contract address.
@@ -226,13 +225,9 @@ contract AutomataDcapV3Attestation is IAttestation, EnclaveIdBase, PEMCertChainB
             }
         }
 
-        output = _serializeOutput(
-            tcbStatus,
-            v3quote.localEnclaveReport.mrEnclave,
-            v3quote.localEnclaveReport.mrSigner,
-            v3quote.localEnclaveReport.reportData,
-            bytes6(pckTcb.fmspcBytes)
-        );
+        bytes memory rawIsvReport = V3Parser.packQEReport(v3quote.localEnclaveReport);
+
+        output = _serializeOutput(tcbStatus, bytes6(pckTcb.fmspcBytes), rawIsvReport);
 
         return (true, output);
     }
@@ -259,19 +254,24 @@ contract AutomataDcapV3Attestation is IAttestation, EnclaveIdBase, PEMCertChainB
         }
     }
 
-    function _serializeOutput(
-        TCBStatus tcbStatus,
-        bytes32 isvMrEnclave,
-        bytes32 isvMrSigner,
-        bytes memory isvReportData,
-        bytes6 fmspcBytes
-    ) private pure returns (bytes memory serialized) {
-        require(isvReportData.length < 65, "invalid enclave report data length");
-        serialized = abi.encodePacked(tcbStatus, isvMrEnclave, isvMrSigner, isvReportData, fmspcBytes);
+    function _serializeOutput(TCBStatus tcbStatus, bytes6 fmspcBytes, bytes memory rawLocalIsvReport)
+        private
+        pure
+        returns (bytes memory serialized)
+    {
+        require(rawLocalIsvReport.length == 384, "invalid isv report length");
+        serialized = abi.encodePacked(
+            uint16(3), // quote_version
+            bytes4(0), // SGX_TEE_TYPE = 0x00000000
+            tcbStatus,
+            fmspcBytes,
+            rawLocalIsvReport
+        );
     }
 
     /// @dev the journal output has the following format:
-    /// @dev serial_output (VerifiedOutput) = 135 bytes
+    /// @dev serial_output_len = 2 bytes
+    /// @dev serial_output (VerifiedOutput) = 397 bytes
     /// @dev current_time = 8 bytes
     /// @dev tcbinfov2_hash = 32 bytes
     /// @dev qeidentityv2_hash = 32 bytes
@@ -280,18 +280,16 @@ contract AutomataDcapV3Attestation is IAttestation, EnclaveIdBase, PEMCertChainB
     /// @dev sgx_intel_root_ca_cert_hash = 32 bytes
     /// @dev sgx_tcb_signing_cert_hash = 32 bytes
     /// @dev sgx_tcb_intel_root_ca_crl_hash = 32 bytes
-    /// @dev sgx_pck_platform_crl_hash = 32 bytes
-    /// @dev sgx_pck_processor_crl_hash = 32 bytes
+    /// @dev sgx_pck_pck_crl_hash = 32 bytes
     function _getCollateralHashesFromJournal(bytes calldata journal)
         private
         pure
         returns (CollateralToBeVerified memory output)
     {
-        output.rootCaHash = bytes32(journal[207:239]);
-        output.tcbSigningHash = bytes32(journal[239:271]);
-        output.rootCaCrlHash = bytes32(journal[271:303]);
-        output.platformCrlHash = bytes32(journal[303:335]);
-        output.processorCrlHash = bytes32(journal[335:367]);
+        output.rootCaHash = bytes32(journal[471:503]);
+        output.tcbSigningHash = bytes32(journal[503:535]);
+        output.rootCaCrlHash = bytes32(journal[535:567]);
+        output.pckCrlHash = bytes32(journal[567:599]);
     }
 
     function _checkCollateralHashes(CollateralToBeVerified memory output) private view returns (bool success) {
@@ -303,16 +301,13 @@ contract AutomataDcapV3Attestation is IAttestation, EnclaveIdBase, PEMCertChainB
         if (!rootCaFound || output.rootCaHash != expectedRootCaHash) {
             return false;
         }
-        (, bytes32 expectedPckPlatformCrlHash) = _getCrlHash(CA.PLATFORM);
-        (, bytes32 expectedPckProcessorCrlHash) = _getCrlHash(CA.PROCESSOR);
-        if (
-            output.platformCrlHash != expectedPckPlatformCrlHash
-                || output.processorCrlHash != expectedPckProcessorCrlHash
-        ) {
-            return false;
-        }
         (bool rootCrlFound, bytes32 expectedRootCrlHash) = _getCrlHash(CA.ROOT);
         if (!rootCrlFound || output.rootCaCrlHash != expectedRootCrlHash) {
+            return false;
+        }
+        (, bytes32 expectedPckPlatformCrlHash) = _getCrlHash(CA.PLATFORM);
+        (, bytes32 expectedPckProcessorCrlHash) = _getCrlHash(CA.PROCESSOR);
+        if (output.pckCrlHash != expectedPckPlatformCrlHash && output.pckCrlHash != expectedPckProcessorCrlHash) {
             return false;
         }
 

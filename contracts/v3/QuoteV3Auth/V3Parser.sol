@@ -257,7 +257,8 @@ library V3Parser {
         V3Struct.CertificationData memory cert;
 
         cert.certType = uint16(littleEndianDecode(rawAuthData.substring(offset, 2)));
-        if (cert.certType < 1 || cert.certType > 5) {
+        // TEMP supported type 5 only
+        if (cert.certType != 5) {
             return (false, authDataV3, rawQeReport);
         }
         offset += 2;
