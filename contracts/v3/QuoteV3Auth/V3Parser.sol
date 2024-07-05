@@ -258,6 +258,7 @@ library V3Parser {
 
         cert.certType = uint16(littleEndianDecode(rawAuthData.substring(offset, 2)));
         // TEMP supported type 5 only
+        // https://github.com/intel/SGXDataCenterAttestationPrimitives/blob/39989a42bbbb0c968153a47254b6de79a27eb603/QuoteGeneration/quote_wrapper/common/inc/sgx_quote_3.h#L57-L66
         if (cert.certType != 5) {
             return (false, authDataV3, rawQeReport);
         }

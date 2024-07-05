@@ -188,7 +188,7 @@ contract AutomataDcapV3Attestation is IAttestation, EnclaveIdBase, PEMCertChainB
         TCBLevelsObj[] memory tcbLevels;
         {
             bool tcbInfoFound;
-            (tcbInfoFound, tcbLevels) = _getTcbInfo(pckTcb.fmspcBytes.toHexStringNoPrefix());
+            (tcbInfoFound, tcbLevels) = _getTcbInfo(bytes6(pckTcb.fmspcBytes));
             if (!tcbInfoFound) {
                 return (false, output);
             }
