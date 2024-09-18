@@ -11,7 +11,7 @@
 
 ## Archived Notification
 
-We released the [Automata DCAP Attestation](https://github.com/automata-network/automata-dcap-attestation) to support Intel SGX/TDX DCAP attestation together with the [Automata On Chain PCCS](https://github.com/automata-network/automata-on-chain-pccs), please check the latest repositories to start your DCAP journey.
+We released [Automata DCAP Attestation](https://github.com/automata-network/automata-dcap-attestation) to support Intel SGX/TDX DCAP attestation together with [Automata On Chain PCCS](https://github.com/automata-network/automata-on-chain-pccs). Check out the latest repositories to start your DCAP journey.
 
 ## Getting Started
 
