@@ -1,4 +1,17 @@
+<div align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/automata-network/automata-brand-kit/main/PNG/ATA_White%20Text%20with%20Color%20Logo.png">
+    <source media="(prefers-color-scheme: light)" srcset="https://raw.githubusercontent.com/automata-network/automata-brand-kit/main/PNG/ATA_Black%20Text%20with%20Color%20Logo.png">
+    <img src="https://raw.githubusercontent.com/automata-network/automata-brand-kit/main/PNG/ATA_White%20Text%20with%20Color%20Logo.png" width="50%">
+  </picture>
+</div>
+
 # AutomataDcapV3Attestation
+[![Automata DCAP V3](https://img.shields.io/badge/Power%20By-Automata-orange.svg)](https://github.com/automata-network)
+
+## Archived Notification
+
+We released the [Automata DCAP Attestation](https://github.com/automata-network/automata-dcap-attestation) to support Intel SGX/TDX DCAP attestation together with the [Automata On Chain PCCS](https://github.com/automata-network/automata-on-chain-pccs), please check the latest repositories to start your DCAP journey.
 
 ## Getting Started
 
